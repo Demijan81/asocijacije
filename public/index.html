@@ -367,20 +367,237 @@
 
     .team-label.t1 { color: #3b82f6; }
     .team-label.t2 { color: #f59e0b; }
+
+    /* Name input on waiting screen */
+    .name-input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      align-items: center;
+    }
+
+    .name-input-row input {
+      background: #1e293b;
+      border: 2px solid #475569;
+      border-radius: 10px;
+      padding: 10px 16px;
+      color: #e2e8f0;
+      font-size: 1.1rem;
+      outline: none;
+      width: 220px;
+    }
+
+    .name-input-row input:focus {
+      border-color: #60a5fa;
+    }
+
+    .name-input-row label {
+      color: #94a3b8;
+      font-size: 0.95rem;
+    }
+
+    .slot-btn.available {
+      cursor: pointer;
+    }
+
+    .slot-btn.available:hover {
+      border-color: #60a5fa;
+      background: #1e3a5f;
+      color: #60a5fa;
+    }
+
+    .slot-name {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* Rules button */
+    .rules-btn {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      background: #334155;
+      color: #94a3b8;
+      border: 1px solid #475569;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      z-index: 100;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .rules-btn:hover {
+      background: #475569;
+      color: #e2e8f0;
+    }
+
+    /* Rules modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.hidden {
+      display: none;
+    }
+
+    .modal {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 520px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .modal h2 {
+      font-size: 1.5rem;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #60a5fa, #fbbf24);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+
+    .modal p, .modal li {
+      color: #cbd5e1;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .modal ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    .modal li {
+      margin-bottom: 6px;
+    }
+
+    .modal .section-title {
+      color: #e2e8f0;
+      font-weight: 700;
+      font-size: 1rem;
+      margin-top: 16px;
+      margin-bottom: 6px;
+    }
+
+    .modal .team-info {
+      display: flex;
+      gap: 16px;
+      margin: 12px 0;
+    }
+
+    .modal .team-box {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 10px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .modal .team-box.blue {
+      background: #1e3a5f;
+      color: #60a5fa;
+      border: 1px solid #3b82f6;
+    }
+
+    .modal .team-box.gold {
+      background: #2d2414;
+      color: #fbbf24;
+      border: 1px solid #f59e0b;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .modal-close:hover {
+      color: #e2e8f0;
+    }
   </style>
 </head>
 <body>
   <div id="app"></div>
 
+  <button class="rules-btn" onclick="toggleRules()" title="Rules">?</button>
+
+  <div class="modal-overlay hidden" id="rulesModal" onclick="if(event.target===this)toggleRules()">
+    <div class="modal">
+      <button class="modal-close" onclick="toggleRules()">&times;</button>
+      <h2>How to Play</h2>
+      <div class="team-info">
+        <div class="team-box blue">Team Blue<br>P1 (top-left) + P4 (bottom-right)</div>
+        <div class="team-box gold">Team Gold<br>P2 (top-right) + P3 (bottom-left)</div>
+      </div>
+      <p class="section-title">Game Flow</p>
+      <ul>
+        <li>The <strong>secret holder</strong> types a secret word that only their <strong>opponent teammate</strong> can see.</li>
+        <li>That opponent gives a <strong>one-word clue</strong> visible to everyone.</li>
+        <li>The <strong>guesser</strong> (from the other pair) has <strong>30 seconds</strong> to guess the secret word with one try.</li>
+        <li>If they miss, the clue-giving and guessing <strong>rotates</strong> between the two pairs until someone guesses correctly.</li>
+      </ul>
+      <p class="section-title">Round Rotation</p>
+      <ul>
+        <li><strong>Round A:</strong> P1 sets the secret word &rarr; P2 sees it &rarr; P2 gives clue &rarr; P3 guesses &rarr; if miss: P1 clue &rarr; P4 guesses &rarr; repeat</li>
+        <li><strong>Round B:</strong> P2 sets the secret word &rarr; P4 sees it &rarr; P4 gives clue &rarr; P1 guesses &rarr; if miss: P2 clue &rarr; P3 guesses &rarr; repeat</li>
+        <li>Rounds alternate after each point scored.</li>
+      </ul>
+      <p class="section-title">Scoring</p>
+      <ul>
+        <li>The team of the player who guesses correctly gets the point.</li>
+        <li>First team to <strong>10 points</strong> wins, but must lead by at least <strong>2 points</strong>.</li>
+        <li>Example: 10-8 wins, but 10-9 doesn't &mdash; play continues to 11-9, 12-10, etc.</li>
+      </ul>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
     let mySlot = -1;
+    let myName = '';
     let currentState = null;
 
     socket.on('assigned', (data) => {
       mySlot = data.slot;
+      myName = data.name;
     });
+
+    function toggleRules() {
+      const modal = document.getElementById('rulesModal');
+      modal.classList.toggle('hidden');
+    }
+
+    function getDisplayName(slot, state) {
+      if (!state || !state.slotNames) return 'Player ' + (slot + 1);
+      return state.slotNames[slot] || ('Player ' + (slot + 1));
+    }
 
     socket.on('state', (state) => {
       currentState = state;
@@ -421,26 +638,58 @@
       const slots = state.slots;
       const teamLabels = ['Team Blue', 'Team Gold', 'Team Gold', 'Team Blue'];
       const teamClasses = ['t1', 't2', 't2', 't1'];
+      const hasJoined = mySlot >= 0;
 
       app.innerHTML = `
         <div class="waiting-screen">
           <h1>Asocijacije</h1>
           <p class="subtitle">Waiting for players... (${slots.filter(s => s).length}/4)</p>
+          ${!hasJoined ? `
+            <div class="name-input-row">
+              <label>Your name:</label>
+              <input type="text" id="nameInput" placeholder="Enter your name..." maxlength="20" value="${myName}">
+            </div>
+            <p class="status-text" style="margin-bottom:16px">Click an empty slot to join</p>
+          ` : ''}
           <div class="slot-grid">
-            ${slots.map((s, i) => `
-              <div class="slot-btn ${s ? 'taken' : ''} ${i === mySlot ? 'is-me' : ''}">
+            ${slots.map((s, i) => {
+              const isTaken = s !== null;
+              const isMe = i === mySlot;
+              const canJoin = !isTaken && !hasJoined;
+              const displayName = state.slotNames[i] || ('Player ' + (i + 1));
+              return `
+              <div class="slot-btn ${isTaken ? 'taken' : ''} ${isMe ? 'is-me' : ''} ${canJoin ? 'available' : ''}"
+                ${canJoin ? `onclick="joinSlot(${i})"` : ''}>
                 <div class="team-label ${teamClasses[i]}">${teamLabels[i]}</div>
-                Player ${i + 1} ${s ? (i === mySlot ? '(You)' : '✓') : '...'}
+                ${isTaken ? `${displayName} ${isMe ? '(You)' : ''}` : 'Open slot...'}
               </div>
-            `).join('')}
+            `}).join('')}
           </div>
         </div>
       `;
+
+      if (!hasJoined) {
+        const nameInput = document.getElementById('nameInput');
+        if (nameInput) nameInput.focus();
+      }
+    }
+
+    function joinSlot(slot) {
+      const nameInput = document.getElementById('nameInput');
+      const name = nameInput ? nameInput.value.trim() : '';
+      if (!name) {
+        nameInput.style.borderColor = '#ef4444';
+        nameInput.focus();
+        return;
+      }
+      myName = name;
+      socket.emit('joinSlot', { slot, name });
     }
 
     function renderGameOver(app, state) {
       const winner = state.scores.team1 > state.scores.team2 ? 'team1' : 'team2';
-      const winnerName = winner === 'team1' ? 'Team Blue (P1 & P4)' : 'Team Gold (P2 & P3)';
+      const n = state.slotNames || ['P1','P2','P3','P4'];
+      const winnerName = winner === 'team1' ? `Team Blue (${n[0] || 'P1'} & ${n[3] || 'P4'})` : `Team Gold (${n[1] || 'P2'} & ${n[2] || 'P3'})`;
       const winnerClass = winner === 'team1' ? 'winner-team1' : 'winner-team2';
 
       app.innerHTML = `
@@ -452,7 +701,7 @@
               <span class="score-divider">:</span>
               <span class="score team2">${state.scores.team2}</span>
             </div>
-            <p style="color:#94a3b8; margin-bottom:8px;">Team Blue (P1 & P4) vs Team Gold (P2 & P3)</p>
+            <p style="color:#94a3b8; margin-bottom:8px;">Team Blue (${n[0] || 'P1'} & ${n[3] || 'P4'}) vs Team Gold (${n[1] || 'P2'} & ${n[2] || 'P3'})</p>
             <button class="btn-reset" onclick="socket.emit('resetGame')">Play Again</button>
           </div>
         </div>
@@ -504,7 +753,7 @@
         return `
           <div class="player-corner ${position}">
             <div class="player-card ${teamClass} ${isEmpty ? 'empty' : ''} ${isMe ? 'is-me' : ''} ${isActive ? 'active' : ''}">
-              <div class="player-name">Player ${slot + 1}${isMe ? ' (You)' : ''}</div>
+              <div class="player-name">${getDisplayName(slot, state)}${isMe ? ' (You)' : ''}</div>
               <div class="player-role ${roleHighlight ? 'highlight' : ''}">${role}</div>
             </div>
           </div>
@@ -538,7 +787,7 @@
           const isWrong = c.wrong;
           centerHTML += `
             <div class="clue-entry ${entryTeam} ${isMyTeam ? 'my-team' : ''} ${isWrong ? 'wrong-guess' : ''}">
-              <span class="clue-player ${entryTeam}">P${c.from + 1}</span>
+              <span class="clue-player ${entryTeam}">${getDisplayName(c.from, state)}</span>
               <span class="clue-word">${c.word}</span>
               <span class="clue-type ${isWrong ? 'type-miss' : 'type-clue'}">${isWrong ? '✗ miss' : 'clue'}</span>
             </div>
@@ -557,7 +806,7 @@
       if (phase === 'secret') {
         if (mySlot === ct.secretHolder) {
           centerHTML += `
-            <p class="status-text">Type the secret word (only Player ${getReceiver(state) + 1} will see it)</p>
+            <p class="status-text">Type the secret word (only ${getDisplayName(getReceiver(state), state)} will see it)</p>
             <div class="input-area">
               <input type="text" id="secretInput" placeholder="Secret word..." autofocus
                 onkeydown="if(event.key==='Enter')submitSecret()">
@@ -565,12 +814,12 @@
             </div>
           `;
         } else {
-          centerHTML += `<p class="status-text">Player ${ct.secretHolder + 1} is choosing the secret word...</p>`;
+          centerHTML += `<p class="status-text">${getDisplayName(ct.secretHolder, state)} is choosing the secret word...</p>`;
         }
       } else if (phase === 'clue') {
         if (mySlot === ct.clueGiver) {
           centerHTML += `
-            <p class="status-text">Type ONE word as a clue for Player ${ct.guesser + 1}</p>
+            <p class="status-text">Type ONE word as a clue for ${getDisplayName(ct.guesser, state)}</p>
             <div class="input-area">
               <input type="text" id="clueInput" placeholder="One word clue..." autofocus
                 onkeydown="if(event.key==='Enter')submitClue()">
@@ -578,7 +827,7 @@
             </div>
           `;
         } else {
-          centerHTML += `<p class="status-text">Player ${ct.clueGiver + 1} is thinking of a clue...</p>`;
+          centerHTML += `<p class="status-text">${getDisplayName(ct.clueGiver, state)} is thinking of a clue...</p>`;
         }
       } else if (phase === 'guess') {
         if (mySlot === ct.guesser) {
@@ -591,7 +840,7 @@
             </div>
           `;
         } else {
-          centerHTML += `<p class="status-text">Player ${ct.guesser + 1} is guessing...</p>`;
+          centerHTML += `<p class="status-text">${getDisplayName(ct.guesser, state)} is guessing...</p>`;
         }
       } else if (phase === 'roundOver') {
         centerHTML += `<div class="round-over-msg">✅ Correct! Point scored!</div>`;

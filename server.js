@@ -14,8 +14,9 @@ let game = createFreshGame();
 
 function createFreshGame() {
   return {
-    players: {}, // socketId -> { slot: 1-4, name: string }
+    players: {}, // socketId -> { slot: 0-3 or -1, name: string }
     slots: [null, null, null, null], // slot index 0-3 -> socketId
+    slotNames: ['', '', '', ''], // custom names per slot
     phase: 'waiting', // waiting | secret | clue | guess | roundOver | gameOver
     scores: { team1: 0, team2: 0 }, // team1 = P1+P4, team2 = P2+P3
     secretWord: null,
@@ -56,7 +57,7 @@ function createFreshGame() {
 //   Round B: P1 (team1) or P3 (team2) guesses correctly -> their team scores.
 
 function getSlotName(slot) {
-  return `Player ${slot + 1}`;
+  return game.slotNames[slot] || `Player ${slot + 1}`;
 }
 
 function getTeam(slot) {
@@ -93,6 +94,7 @@ function broadcastState() {
       phase: game.phase,
       scores: game.scores,
       slots: game.slots.map((s, idx) => s ? { slot: idx, name: getSlotName(idx), connected: true } : null),
+      slotNames: game.slotNames,
       mySlot: i,
       clues: game.clues,
       timeLeft: game.timeLeft,
@@ -126,6 +128,7 @@ function broadcastState() {
         phase: game.phase,
         scores: game.scores,
         slots: game.slots.map((s, idx) => s ? { slot: idx, name: getSlotName(idx), connected: true } : null),
+        slotNames: game.slotNames,
         mySlot: -1,
         clues: game.clues,
         timeLeft: game.timeLeft,
@@ -196,31 +199,38 @@ function checkWin() {
 io.on('connection', (socket) => {
   console.log(`Connected: ${socket.id}`);
 
-  // Find first available slot
-  let assignedSlot = -1;
-  for (let i = 0; i < 4; i++) {
-    if (!game.slots[i]) {
-      assignedSlot = i;
-      game.slots[i] = socket.id;
-      break;
+  game.players[socket.id] = { slot: -1, name: '' };
+  socket.emit('assigned', { slot: -1, name: 'Spectator' });
+  broadcastState();
+
+  // Player picks a slot and sets their name
+  socket.on('joinSlot', ({ slot, name }) => {
+    if (slot < 0 || slot > 3) return;
+    if (game.slots[slot] !== null) return; // already taken
+    if (game.phase !== 'waiting') return;
+
+    // Remove from previous slot if any
+    const player = game.players[socket.id];
+    if (player && player.slot >= 0) {
+      game.slots[player.slot] = null;
+      game.slotNames[player.slot] = '';
     }
-  }
 
-  game.players[socket.id] = { slot: assignedSlot };
+    const trimmedName = (name || '').trim().substring(0, 20) || `Player ${slot + 1}`;
+    game.slots[slot] = socket.id;
+    game.slotNames[slot] = trimmedName;
+    game.players[socket.id] = { slot, name: trimmedName };
 
-  if (assignedSlot >= 0) {
-    socket.emit('assigned', { slot: assignedSlot, name: getSlotName(assignedSlot) });
-  } else {
-    socket.emit('assigned', { slot: -1, name: 'Spectator' });
-  }
+    socket.emit('assigned', { slot, name: trimmedName });
 
-  // Check if all 4 slots filled -> start game
-  if (game.slots.every(s => s !== null) && game.phase === 'waiting') {
-    game.roundStarter = 0;
-    startNewRound();
-  } else {
-    broadcastState();
-  }
+    // Check if all 4 slots filled -> start game
+    if (game.slots.every(s => s !== null) && game.phase === 'waiting') {
+      game.roundStarter = 0;
+      startNewRound();
+    } else {
+      broadcastState();
+    }
+  });
 
   // Secret word submission (from secret holder)
   socket.on('submitSecret', (word) => {
@@ -306,12 +316,14 @@ io.on('connection', (socket) => {
   socket.on('resetGame', () => {
     clearTimer();
     const oldSlots = [...game.slots];
+    const oldNames = [...game.slotNames];
     game = createFreshGame();
     // Re-assign connected players
     for (let i = 0; i < 4; i++) {
       if (oldSlots[i] && io.sockets.sockets.get(oldSlots[i])) {
         game.slots[i] = oldSlots[i];
-        game.players[oldSlots[i]] = { slot: i };
+        game.slotNames[i] = oldNames[i];
+        game.players[oldSlots[i]] = { slot: i, name: oldNames[i] };
       }
     }
     if (game.slots.every(s => s !== null)) {
@@ -328,6 +340,7 @@ io.on('connection', (socket) => {
     const player = game.players[socket.id];
     if (player && player.slot >= 0) {
       game.slots[player.slot] = null;
+      game.slotNames[player.slot] = '';
       clearTimer();
       if (game.phase !== 'waiting' && game.phase !== 'gameOver') {
         game.phase = 'waiting';
