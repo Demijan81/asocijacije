@@ -1,0 +1,68 @@
+name: Build and Deploy to DigitalOcean Kubernetes
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'server.js'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile'
+      - 'k8s/**'
+      - '.github/workflows/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+    - name: Build container image
+      run: docker build -t registry.digitalocean.com/oneseed/asocijacije:$(echo $GITHUB_SHA | head -c7) .
+
+    - name: Log in to DigitalOcean Container Registry
+      run: doctl registry login --expiry-seconds 1200
+
+    - name: Push image to DigitalOcean Container Registry
+      run: docker push registry.digitalocean.com/oneseed/asocijacije:$(echo $GITHUB_SHA | head -c7)
+
+    - name: Save DigitalOcean kubeconfig
+      run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 ${{ secrets.DIGITALOCEAN_CLUSTER_NAME }}
+
+    - name: Deploy to DigitalOcean Kubernetes
+      run: |
+        TAG=$(echo $GITHUB_SHA | head -c7)
+        echo "Deploying with tag: $TAG"
+
+        # Create a temporary deployment file with the correct image
+        cp k8s/deployment.yaml k8s/deployment-temp.yaml
+        sed -i "s|image: asocijacije:latest|image: registry.digitalocean.com/oneseed/asocijacije:$TAG|g" k8s/deployment-temp.yaml
+        sed -i "s|imagePullPolicy: IfNotPresent|imagePullPolicy: Always|g" k8s/deployment-temp.yaml
+
+        # Apply all manifests in correct order
+        kubectl apply -f k8s/namespace.yaml
+        kubectl apply -f k8s/service.yaml
+        kubectl apply -f k8s/deployment-temp.yaml
+        kubectl apply -f k8s/ingress.yaml
+
+        # Force image update and restart
+        kubectl set image deployment/asocijacije asocijacije=registry.digitalocean.com/oneseed/asocijacije:$TAG -n asocijacije
+        kubectl patch deployment asocijacije -p '{"spec":{"template":{"metadata":{"annotations":{"kubectl.kubernetes.io/restartedAt":"'$(date +%Y-%m-%dT%H:%M:%S%z)'"}}}}}' -n asocijacije
+
+        # Clean up temp file
+        rm k8s/deployment-temp.yaml
+
+    - name: Verify deployment
+      run: |
+        kubectl rollout status deployment/asocijacije -n asocijacije --timeout=300s
+        kubectl get pods -n asocijacije
+        kubectl get services -n asocijacije
