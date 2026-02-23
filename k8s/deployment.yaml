@@ -17,6 +17,8 @@ spec:
       labels:
         app: asocijacije
     spec:
+      imagePullSecrets:
+      - name: ghcr-secret
       terminationGracePeriodSeconds: 30
       containers:
       - name: asocijacije
