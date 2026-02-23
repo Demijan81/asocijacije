@@ -17,7 +17,8 @@ function createFreshGame() {
     players: {}, // socketId -> { slot: 0-3 or -1, name: string }
     slots: [null, null, null, null], // slot index 0-3 -> socketId
     slotNames: ['', '', '', ''], // custom names per slot
-    phase: 'waiting', // waiting | secret | clue | guess | roundOver | gameOver
+    adminSlot: -1, // slot of the admin player (first to join)
+    phase: 'waiting', // waiting | countdown | secret | clue | guess | roundOver | gameOver
     scores: { team1: 0, team2: 0 }, // team1 = P1+P4, team2 = P2+P3
     secretWord: null,
     clues: [],
@@ -26,6 +27,7 @@ function createFreshGame() {
     turnWithinRound: 0, // 0-based turn count within a round
     timer: null,
     timeLeft: 0,
+    countdownLeft: 0, // seconds remaining in pre-game countdown
   };
 }
 
@@ -82,7 +84,7 @@ function getRoundConfig(roundStarter, turnWithinRound) {
 }
 
 function broadcastState() {
-  const config = game.phase !== 'waiting' && game.phase !== 'gameOver'
+  const config = game.phase !== 'waiting' && game.phase !== 'gameOver' && game.phase !== 'countdown'
     ? getRoundConfig(game.roundStarter, game.turnWithinRound)
     : null;
 
@@ -95,9 +97,11 @@ function broadcastState() {
       scores: game.scores,
       slots: game.slots.map((s, idx) => s ? { slot: idx, name: getSlotName(idx), connected: true } : null),
       slotNames: game.slotNames,
+      adminSlot: game.adminSlot,
       mySlot: i,
       clues: game.clues,
       timeLeft: game.timeLeft,
+      countdownLeft: game.countdownLeft,
       secretWord: null,
       currentTurn: config ? {
         secretHolder: config.secretHolder,
@@ -129,9 +133,11 @@ function broadcastState() {
         scores: game.scores,
         slots: game.slots.map((s, idx) => s ? { slot: idx, name: getSlotName(idx), connected: true } : null),
         slotNames: game.slotNames,
+        adminSlot: game.adminSlot,
         mySlot: -1,
         clues: game.clues,
         timeLeft: game.timeLeft,
+        countdownLeft: game.countdownLeft,
         secretWord: null,
         currentTurn: config ? {
           secretHolder: config.secretHolder,
@@ -207,7 +213,7 @@ io.on('connection', (socket) => {
   socket.on('joinSlot', ({ slot, name }) => {
     if (slot < 0 || slot > 3) return;
     if (game.slots[slot] !== null) return; // already taken
-    if (game.phase !== 'waiting') return;
+    if (game.phase !== 'waiting' && game.phase !== 'countdown') return;
 
     // Remove from previous slot if any
     const player = game.players[socket.id];
@@ -221,15 +227,71 @@ io.on('connection', (socket) => {
     game.slotNames[slot] = trimmedName;
     game.players[socket.id] = { slot, name: trimmedName };
 
-    socket.emit('assigned', { slot, name: trimmedName });
-
-    // Check if all 4 slots filled -> start game
-    if (game.slots.every(s => s !== null) && game.phase === 'waiting') {
-      game.roundStarter = 0;
-      startNewRound();
-    } else {
-      broadcastState();
+    // First player to join becomes admin
+    if (game.adminSlot === -1) {
+      game.adminSlot = slot;
     }
+
+    socket.emit('assigned', { slot, name: trimmedName });
+    broadcastState();
+  });
+
+  // Admin starts game immediately
+  socket.on('startGame', () => {
+    if (game.phase !== 'waiting') return;
+    const player = game.players[socket.id];
+    if (!player || player.slot !== game.adminSlot) return;
+    // Need at least 4 players
+    if (!game.slots.every(s => s !== null)) return;
+
+    clearTimer();
+    game.countdownLeft = 0;
+    game.roundStarter = 0;
+    startNewRound();
+  });
+
+  // Admin sets a countdown timer before game starts
+  socket.on('startCountdown', (seconds) => {
+    if (game.phase !== 'waiting') return;
+    const player = game.players[socket.id];
+    if (!player || player.slot !== game.adminSlot) return;
+
+    const secs = Math.max(5, Math.min(300, parseInt(seconds) || 30));
+    game.phase = 'countdown';
+    game.countdownLeft = secs;
+    clearTimer();
+    broadcastState();
+
+    game.timer = setInterval(() => {
+      game.countdownLeft--;
+      if (game.countdownLeft <= 0) {
+        clearTimer();
+        // Start game if 4 players, otherwise back to waiting
+        if (game.slots.every(s => s !== null)) {
+          game.countdownLeft = 0;
+          game.roundStarter = 0;
+          startNewRound();
+        } else {
+          game.phase = 'waiting';
+          game.countdownLeft = 0;
+          broadcastState();
+        }
+      } else {
+        io.emit('countdownTick', game.countdownLeft);
+      }
+    }, 1000);
+  });
+
+  // Admin cancels countdown
+  socket.on('cancelCountdown', () => {
+    if (game.phase !== 'countdown') return;
+    const player = game.players[socket.id];
+    if (!player || player.slot !== game.adminSlot) return;
+
+    clearTimer();
+    game.phase = 'waiting';
+    game.countdownLeft = 0;
+    broadcastState();
   });
 
   // Secret word submission (from secret holder)
@@ -317,6 +379,7 @@ io.on('connection', (socket) => {
     clearTimer();
     const oldSlots = [...game.slots];
     const oldNames = [...game.slotNames];
+    const oldAdmin = game.adminSlot;
     game = createFreshGame();
     // Re-assign connected players
     for (let i = 0; i < 4; i++) {
@@ -326,12 +389,14 @@ io.on('connection', (socket) => {
         game.players[oldSlots[i]] = { slot: i, name: oldNames[i] };
       }
     }
-    if (game.slots.every(s => s !== null)) {
-      game.roundStarter = 0;
-      startNewRound();
-    } else {
-      broadcastState();
+    // Preserve admin
+    game.adminSlot = (oldAdmin >= 0 && game.slots[oldAdmin]) ? oldAdmin : -1;
+    if (game.adminSlot === -1) {
+      for (let i = 0; i < 4; i++) {
+        if (game.slots[i] !== null) { game.adminSlot = i; break; }
+      }
     }
+    broadcastState();
     io.emit('gameReset');
   });
 
@@ -339,11 +404,23 @@ io.on('connection', (socket) => {
     console.log(`Disconnected: ${socket.id}`);
     const player = game.players[socket.id];
     if (player && player.slot >= 0) {
+      const wasAdmin = player.slot === game.adminSlot;
       game.slots[player.slot] = null;
       game.slotNames[player.slot] = '';
       clearTimer();
       if (game.phase !== 'waiting' && game.phase !== 'gameOver') {
         game.phase = 'waiting';
+        game.countdownLeft = 0;
+      }
+      // Transfer admin to next connected player
+      if (wasAdmin) {
+        game.adminSlot = -1;
+        for (let i = 0; i < 4; i++) {
+          if (game.slots[i] !== null) {
+            game.adminSlot = i;
+            break;
+          }
+        }
       }
     }
     delete game.players[socket.id];

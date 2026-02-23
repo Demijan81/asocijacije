@@ -540,6 +540,122 @@
     .modal-close:hover {
       color: #e2e8f0;
     }
+
+    /* Admin controls */
+    .admin-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-top: 20px;
+      padding: 20px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .admin-controls .admin-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #f59e0b;
+    }
+
+    .admin-controls .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-start {
+      background: #22c55e;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-start:hover { background: #16a34a; }
+
+    .btn-start:disabled {
+      background: #334155;
+      color: #64748b;
+      cursor: not-allowed;
+    }
+
+    .btn-countdown {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-countdown:hover { background: #2563eb; }
+
+    .btn-cancel {
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-cancel:hover { background: #dc2626; }
+
+    .admin-badge {
+      display: inline-block;
+      background: #f59e0b;
+      color: #0f172a;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+
+    /* Countdown display */
+    .countdown-display {
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .countdown-display .countdown-timer {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: #f59e0b;
+      margin: 8px 0;
+    }
+
+    .countdown-display .countdown-label {
+      font-size: 1.1rem;
+      color: #94a3b8;
+    }
+
+    .countdown-display .countdown-note {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -614,6 +730,15 @@
       }
     });
 
+    socket.on('countdownTick', (secondsLeft) => {
+      const cdEl = document.querySelector('.countdown-timer');
+      if (cdEl) {
+        const mins = Math.floor(secondsLeft / 60);
+        const secs = secondsLeft % 60;
+        cdEl.textContent = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
+      }
+    });
+
     socket.on('gameReset', () => {
       // handled by state update
     });
@@ -621,7 +746,7 @@
     function render(state) {
       const app = document.getElementById('app');
 
-      if (state.phase === 'waiting') {
+      if (state.phase === 'waiting' || state.phase === 'countdown') {
         renderWaiting(app, state);
         return;
       }
@@ -639,17 +764,59 @@
       const teamLabels = ['Team Blue', 'Team Gold', 'Team Gold', 'Team Blue'];
       const teamClasses = ['t1', 't2', 't2', 't1'];
       const hasJoined = mySlot >= 0;
+      const isAdmin = mySlot === state.adminSlot;
+      const isCountdown = state.phase === 'countdown';
+      const allFilled = slots.every(s => s !== null);
+
+      let countdownHTML = '';
+      if (isCountdown) {
+        const mins = Math.floor(state.countdownLeft / 60);
+        const secs = state.countdownLeft % 60;
+        const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
+        countdownHTML = `
+          <div class="countdown-display">
+            <p class="countdown-label">Game starting in</p>
+            <div class="countdown-timer">${timeStr}</div>
+            ${!allFilled ? '<p class="countdown-note">Waiting for all 4 players to join before timer ends...</p>' : ''}
+            ${isAdmin ? '<button class="btn-cancel" onclick="socket.emit(\'cancelCountdown\')">Cancel</button>' : ''}
+          </div>
+        `;
+      }
+
+      let adminHTML = '';
+      if (isAdmin && !isCountdown) {
+        adminHTML = `
+          <div class="admin-controls">
+            <span class="admin-title">Admin Controls</span>
+            <div class="btn-row">
+              <button class="btn-start" ${allFilled ? '' : 'disabled'} onclick="socket.emit('startGame')">Start Now</button>
+              <button class="btn-countdown" onclick="socket.emit('startCountdown', 30)">30s</button>
+              <button class="btn-countdown" onclick="socket.emit('startCountdown', 60)">1 min</button>
+              <button class="btn-countdown" onclick="socket.emit('startCountdown', 120)">2 min</button>
+              <button class="btn-countdown" onclick="socket.emit('startCountdown', 300)">5 min</button>
+            </div>
+            ${!allFilled ? '<p style="color:#64748b;font-size:0.85rem">Start Now requires all 4 slots filled. Countdown lets players join before time runs out.</p>' : ''}
+          </div>
+        `;
+      }
 
       app.innerHTML = `
         <div class="waiting-screen">
           <h1>Asocijacije</h1>
-          <p class="subtitle">Waiting for players... (${slots.filter(s => s).length}/4)</p>
-          ${!hasJoined ? `
+          <p class="subtitle">${isCountdown ? 'Get ready!' : `Waiting for players... (${slots.filter(s => s).length}/4)`}</p>
+          ${!hasJoined && !isCountdown ? `
             <div class="name-input-row">
               <label>Your name:</label>
               <input type="text" id="nameInput" placeholder="Enter your name..." maxlength="20" value="${myName}">
             </div>
             <p class="status-text" style="margin-bottom:16px">Click an empty slot to join</p>
+          ` : ''}
+          ${!hasJoined && isCountdown ? `
+            <div class="name-input-row">
+              <label>Your name:</label>
+              <input type="text" id="nameInput" placeholder="Enter your name..." maxlength="20" value="${myName}">
+            </div>
+            <p class="status-text" style="margin-bottom:16px">Hurry! Pick a slot before the timer runs out</p>
           ` : ''}
           <div class="slot-grid">
             ${slots.map((s, i) => {
@@ -657,14 +824,17 @@
               const isMe = i === mySlot;
               const canJoin = !isTaken && !hasJoined;
               const displayName = state.slotNames[i] || ('Player ' + (i + 1));
+              const isSlotAdmin = i === state.adminSlot;
               return `
               <div class="slot-btn ${isTaken ? 'taken' : ''} ${isMe ? 'is-me' : ''} ${canJoin ? 'available' : ''}"
                 ${canJoin ? `onclick="joinSlot(${i})"` : ''}>
                 <div class="team-label ${teamClasses[i]}">${teamLabels[i]}</div>
-                ${isTaken ? `${displayName} ${isMe ? '(You)' : ''}` : 'Open slot...'}
+                ${isTaken ? `${displayName}${isSlotAdmin ? '<span class="admin-badge">Admin</span>' : ''} ${isMe ? '(You)' : ''}` : 'Open slot...'}
               </div>
             `}).join('')}
           </div>
+          ${countdownHTML}
+          ${adminHTML}
         </div>
       `;
 
