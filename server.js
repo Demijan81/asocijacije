@@ -2,11 +2,16 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const cookieParser = require('cookie-parser');
+const { router: authRouter, verifyToken } = require('./auth');
+const { stmts } = require('./db');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+app.use(cookieParser());
+app.use('/api/auth', authRouter);
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Game state
@@ -14,9 +19,10 @@ let game = createFreshGame();
 
 function createFreshGame() {
   return {
-    players: {}, // socketId -> { slot: 0-3 or -1, name: string }
+    players: {}, // socketId -> { slot: 0-3 or -1, name: string, userId: number|null, avatar: string, stats: {} }
     slots: [null, null, null, null], // slot index 0-3 -> socketId
     slotNames: ['', '', '', ''], // custom names per slot
+    slotProfiles: [null, null, null, null], // { userId, avatar, games_played, games_won } per slot
     adminSlot: -1, // slot of the admin player (first to join)
     phase: 'waiting', // waiting | countdown | secret | clue | guess | roundOver | gameOver
     scores: { team1: 0, team2: 0 }, // team1 = P1+P4, team2 = P2+P3
@@ -97,6 +103,7 @@ function broadcastState() {
       scores: game.scores,
       slots: game.slots.map((s, idx) => s ? { slot: idx, name: getSlotName(idx), connected: true } : null),
       slotNames: game.slotNames,
+      slotProfiles: game.slotProfiles,
       adminSlot: game.adminSlot,
       mySlot: i,
       clues: game.clues,
@@ -133,6 +140,7 @@ function broadcastState() {
         scores: game.scores,
         slots: game.slots.map((s, idx) => s ? { slot: idx, name: getSlotName(idx), connected: true } : null),
         slotNames: game.slotNames,
+        slotProfiles: game.slotProfiles,
         adminSlot: game.adminSlot,
         mySlot: -1,
         clues: game.clues,
@@ -196,16 +204,50 @@ function checkWin() {
   if (maxScore >= 10 && diff >= 2) {
     game.phase = 'gameOver';
     clearTimer();
+
+    // Track stats for logged-in players
+    const winningTeam = team1 > team2 ? 'team1' : 'team2';
+    for (let i = 0; i < 4; i++) {
+      const sid = game.slots[i];
+      if (!sid) continue;
+      const p = game.players[sid];
+      if (!p || !p.userId) continue;
+      const playerTeam = getTeam(i);
+      if (playerTeam === winningTeam) {
+        stmts.addGameWon.run(p.userId);
+      } else {
+        stmts.addGamePlayed.run(p.userId);
+      }
+      // Refresh profile in slot
+      const fresh = stmts.getProfile.get(p.userId);
+      if (fresh) {
+        p.stats = { games_played: fresh.games_played, games_won: fresh.games_won };
+        if (game.slotProfiles[i]) {
+          game.slotProfiles[i].stats = p.stats;
+        }
+      }
+    }
+
     broadcastState();
     return true;
   }
   return false;
 }
 
+// Resolve user profile from socket auth token
+function resolveUser(socket) {
+  const token = socket.handshake.auth?.token;
+  if (!token) return null;
+  const decoded = verifyToken(token);
+  if (!decoded) return null;
+  return stmts.getProfile.get(decoded.userId) || null;
+}
+
 io.on('connection', (socket) => {
   console.log(`Connected: ${socket.id}`);
 
-  game.players[socket.id] = { slot: -1, name: '' };
+  const authUser = resolveUser(socket);
+  game.players[socket.id] = { slot: -1, name: '', userId: authUser?.id || null, avatar: authUser?.avatar || null, stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : null };
   socket.emit('assigned', { slot: -1, name: 'Spectator' });
   broadcastState();
 
@@ -225,7 +267,9 @@ io.on('connection', (socket) => {
     const trimmedName = (name || '').trim().substring(0, 20) || `Player ${slot + 1}`;
     game.slots[slot] = socket.id;
     game.slotNames[slot] = trimmedName;
-    game.players[socket.id] = { slot, name: trimmedName };
+    const playerData = game.players[socket.id];
+    game.players[socket.id] = { slot, name: trimmedName, userId: playerData?.userId || null, avatar: playerData?.avatar || null, stats: playerData?.stats || null };
+    game.slotProfiles[slot] = playerData?.userId ? { userId: playerData.userId, avatar: playerData.avatar, stats: playerData.stats } : null;
 
     // First player to join becomes admin
     if (game.adminSlot === -1) {
@@ -379,6 +423,8 @@ io.on('connection', (socket) => {
     clearTimer();
     const oldSlots = [...game.slots];
     const oldNames = [...game.slotNames];
+    const oldProfiles = [...game.slotProfiles];
+    const oldPlayers = { ...game.players };
     const oldAdmin = game.adminSlot;
     game = createFreshGame();
     // Re-assign connected players
@@ -386,7 +432,9 @@ io.on('connection', (socket) => {
       if (oldSlots[i] && io.sockets.sockets.get(oldSlots[i])) {
         game.slots[i] = oldSlots[i];
         game.slotNames[i] = oldNames[i];
-        game.players[oldSlots[i]] = { slot: i, name: oldNames[i] };
+        game.slotProfiles[i] = oldProfiles[i];
+        const op = oldPlayers[oldSlots[i]];
+        game.players[oldSlots[i]] = { slot: i, name: oldNames[i], userId: op?.userId || null, avatar: op?.avatar || null, stats: op?.stats || null };
       }
     }
     // Preserve admin
@@ -407,6 +455,7 @@ io.on('connection', (socket) => {
       const wasAdmin = player.slot === game.adminSlot;
       game.slots[player.slot] = null;
       game.slotNames[player.slot] = '';
+      game.slotProfiles[player.slot] = null;
       clearTimer();
       if (game.phase !== 'waiting' && game.phase !== 'gameOver') {
         game.phase = 'waiting';

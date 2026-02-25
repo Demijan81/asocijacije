@@ -656,6 +656,338 @@
       color: #64748b;
       margin-top: 8px;
     }
+
+    /* Auth screens */
+    .auth-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 16px;
+    }
+
+    .auth-screen h1 {
+      font-size: 2.5rem;
+      margin-bottom: 4px;
+      background: linear-gradient(135deg, #60a5fa, #fbbf24);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+
+    .auth-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 28px 32px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .auth-box h2 {
+      font-size: 1.3rem;
+      margin-bottom: 16px;
+      color: #e2e8f0;
+    }
+
+    .auth-box .form-group {
+      margin-bottom: 14px;
+    }
+
+    .auth-box label {
+      display: block;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+
+    .auth-box input {
+      width: 100%;
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #e2e8f0;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    .auth-box input:focus {
+      border-color: #60a5fa;
+    }
+
+    .auth-box .btn-primary {
+      width: 100%;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 11px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background 0.2s;
+    }
+
+    .auth-box .btn-primary:hover { background: #2563eb; }
+
+    .auth-box .btn-secondary {
+      width: 100%;
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all 0.2s;
+    }
+
+    .auth-box .btn-secondary:hover {
+      color: #e2e8f0;
+      border-color: #60a5fa;
+    }
+
+    .auth-box .error-msg {
+      color: #f87171;
+      font-size: 0.85rem;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .auth-box .success-msg {
+      color: #34d399;
+      font-size: 0.85rem;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .auth-link {
+      color: #60a5fa;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .auth-link:hover { text-decoration: underline; }
+
+    .guest-link {
+      color: #64748b;
+      cursor: pointer;
+      font-size: 0.85rem;
+      margin-top: 8px;
+    }
+
+    .guest-link:hover { color: #94a3b8; }
+
+    /* Profile bar (top-left) */
+    .profile-bar {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 100;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .profile-bar:hover { border-color: #60a5fa; }
+
+    .profile-bar .avatar {
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+
+    .profile-bar .profile-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .profile-bar .profile-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .profile-bar .profile-stat {
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+
+    /* Profile modal */
+    .profile-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .profile-modal.hidden { display: none; }
+
+    .profile-panel {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 28px 32px;
+      width: 100%;
+      max-width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .profile-panel h2 {
+      font-size: 1.4rem;
+      margin-bottom: 16px;
+      color: #e2e8f0;
+    }
+
+    .profile-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: #0f172a;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #e2e8f0;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.7rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Emoji picker */
+    .emoji-picker {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+      margin: 12px 0;
+    }
+
+    .emoji-option {
+      font-size: 1.5rem;
+      padding: 6px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      text-align: center;
+      background: #0f172a;
+      transition: all 0.15s;
+    }
+
+    .emoji-option:hover {
+      background: #334155;
+      transform: scale(1.15);
+    }
+
+    .emoji-option.selected {
+      border-color: #3b82f6;
+      background: #1e3a5f;
+    }
+
+    .section-label {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      margin-top: 16px;
+    }
+
+    /* 2FA section */
+    .twofa-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #334155;
+    }
+
+    .twofa-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .twofa-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+
+    .twofa-badge.on { background: #166534; color: #4ade80; }
+    .twofa-badge.off { background: #3b1c1c; color: #f87171; }
+
+    .qr-container {
+      text-align: center;
+      margin: 12px 0;
+    }
+
+    .qr-container img {
+      border-radius: 10px;
+      background: white;
+      padding: 8px;
+    }
+
+    .qr-container .secret-code {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      word-break: break-all;
+      margin-top: 6px;
+    }
+
+    /* Player card avatar + stats */
+    .player-avatar {
+      font-size: 2rem;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .player-stats-mini {
+      font-size: 0.7rem;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    /* Slot avatar on waiting screen */
+    .slot-avatar {
+      font-size: 1.4rem;
+      margin-bottom: 2px;
+    }
+
+    .slot-stats {
+      font-size: 0.7rem;
+      color: #64748b;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -693,69 +1025,439 @@
     </div>
   </div>
 
+  <div class="profile-modal hidden" id="profileModal" onclick="if(event.target===this)toggleProfile()">
+    <div class="profile-panel" id="profilePanel"></div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    // ─── Auth state ────────────────────────────────
+    let authToken = localStorage.getItem('authToken') || null;
+    let userProfile = null; // { id, username, email, avatar, totp_enabled, games_played, games_won }
+    let authScreen = 'login'; // login | register | verify2fa
+    let pending2faToken = null;
+    let setup2faData = null; // { secret, qrDataUrl }
+
+    const AVATARS = [
+      '😀','😎','🤓','🥳','😈','👻','🤖','👽',
+      '🦊','🐱','🐶','🐻','🦁','🐸','🐧','🦄',
+      '🔥','⚡','🌟','💎','🎮','🎯','🏆','🎪',
+      '🚀','🌈','🎸','🎭','🧙','🦸','🧛','🤠',
+    ];
+
+    // ─── Socket setup (with auth) ──────────────────
+    let socket = null;
     let mySlot = -1;
     let myName = '';
     let currentState = null;
 
-    socket.on('assigned', (data) => {
-      mySlot = data.slot;
-      myName = data.name;
-    });
+    function connectSocket() {
+      if (socket) socket.disconnect();
+      socket = io({ auth: { token: authToken } });
 
-    function toggleRules() {
-      const modal = document.getElementById('rulesModal');
-      modal.classList.toggle('hidden');
+      socket.on('assigned', (data) => {
+        mySlot = data.slot;
+        myName = data.name;
+      });
+
+      socket.on('state', (state) => {
+        currentState = state;
+        mySlot = state.mySlot;
+        render(state);
+      });
+
+      socket.on('tick', (timeLeft) => {
+        const timerEl = document.querySelector('.timer');
+        if (timerEl) {
+          timerEl.textContent = timeLeft + 's';
+          timerEl.className = 'timer' + (timeLeft > 10 ? ' safe' : '');
+        }
+      });
+
+      socket.on('countdownTick', (secondsLeft) => {
+        const cdEl = document.querySelector('.countdown-timer');
+        if (cdEl) {
+          const mins = Math.floor(secondsLeft / 60);
+          const secs = secondsLeft % 60;
+          cdEl.textContent = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
+        }
+      });
+
+      socket.on('gameReset', () => {});
     }
 
+    // ─── Auth API helpers ──────────────────────────
+    async function api(path, body) {
+      const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
+      if (authToken) opts.headers['Authorization'] = 'Bearer ' + authToken;
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch('/api/auth' + path, opts);
+      return res.json();
+    }
+
+    async function apiGet(path) {
+      const opts = { headers: {}, credentials: 'same-origin' };
+      if (authToken) opts.headers['Authorization'] = 'Bearer ' + authToken;
+      const res = await fetch('/api/auth' + path, opts);
+      return res.json();
+    }
+
+    async function tryAutoLogin() {
+      if (!authToken) { renderAuth(); return; }
+      const data = await apiGet('/me');
+      if (data.profile) {
+        userProfile = data.profile;
+        onLoggedIn();
+      } else {
+        authToken = null;
+        localStorage.removeItem('authToken');
+        renderAuth();
+      }
+    }
+
+    function onLoggedIn() {
+      myName = userProfile.username;
+      updateProfileBar();
+      connectSocket();
+    }
+
+    function enterAsGuest() {
+      authToken = null;
+      userProfile = null;
+      localStorage.removeItem('authToken');
+      updateProfileBar();
+      connectSocket();
+    }
+
+    function updateProfileBar() {
+      let bar = document.getElementById('profileBar');
+      if (userProfile) {
+        if (!bar) {
+          bar = document.createElement('div');
+          bar.id = 'profileBar';
+          bar.className = 'profile-bar';
+          bar.onclick = () => toggleProfile();
+          document.body.appendChild(bar);
+        }
+        const wp = userProfile.games_played ? Math.round(userProfile.games_won / userProfile.games_played * 100) : 0;
+        bar.innerHTML = `
+          <span class="avatar">${userProfile.avatar || '😀'}</span>
+          <div class="profile-info">
+            <span class="profile-name">${userProfile.username}</span>
+            <span class="profile-stat">${userProfile.games_won}W / ${userProfile.games_played}G (${wp}%)</span>
+          </div>
+        `;
+        bar.style.display = 'flex';
+      } else {
+        if (bar) bar.style.display = 'none';
+      }
+    }
+
+    // ─── Auth screen rendering ─────────────────────
+    function renderAuth() {
+      const app = document.getElementById('app');
+      if (authScreen === 'login') {
+        app.innerHTML = `
+          <div class="auth-screen">
+            <h1>Asocijacije</h1>
+            <div class="auth-box">
+              <h2>Log In</h2>
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="authEmail" placeholder="you@example.com">
+              </div>
+              <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="authPassword" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()">
+              </div>
+              <button class="btn-primary" onclick="doLogin()">Log In</button>
+              <button class="btn-secondary" onclick="authScreen='register';renderAuth()">Create Account</button>
+              <div id="authError"></div>
+            </div>
+            <span class="guest-link" onclick="enterAsGuest()">Continue as guest</span>
+          </div>
+        `;
+        document.getElementById('authEmail')?.focus();
+      } else if (authScreen === 'register') {
+        app.innerHTML = `
+          <div class="auth-screen">
+            <h1>Asocijacije</h1>
+            <div class="auth-box">
+              <h2>Create Account</h2>
+              <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="regUsername" placeholder="Pick a username" maxlength="20">
+              </div>
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="regEmail" placeholder="you@example.com">
+              </div>
+              <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="regPassword" placeholder="Min 6 characters" onkeydown="if(event.key==='Enter')doRegister()">
+              </div>
+              <button class="btn-primary" onclick="doRegister()">Sign Up</button>
+              <button class="btn-secondary" onclick="authScreen='login';renderAuth()">Back to Login</button>
+              <div id="authError"></div>
+            </div>
+            <span class="guest-link" onclick="enterAsGuest()">Continue as guest</span>
+          </div>
+        `;
+        document.getElementById('regUsername')?.focus();
+      } else if (authScreen === 'verify2fa') {
+        app.innerHTML = `
+          <div class="auth-screen">
+            <h1>Asocijacije</h1>
+            <div class="auth-box">
+              <h2>Two-Factor Authentication</h2>
+              <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:12px;">Enter the 6-digit code from your authenticator app.</p>
+              <div class="form-group">
+                <label>2FA Code</label>
+                <input type="text" id="tfaCode" placeholder="000000" maxlength="6" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')doVerify2fa()">
+              </div>
+              <button class="btn-primary" onclick="doVerify2fa()">Verify</button>
+              <button class="btn-secondary" onclick="authScreen='login';pending2faToken=null;renderAuth()">Back</button>
+              <div id="authError"></div>
+            </div>
+          </div>
+        `;
+        document.getElementById('tfaCode')?.focus();
+      }
+    }
+
+    async function doLogin() {
+      const email = document.getElementById('authEmail')?.value?.trim();
+      const password = document.getElementById('authPassword')?.value;
+      if (!email || !password) return showAuthError('Fill in all fields');
+      const data = await api('/login', { email, password });
+      if (data.error) return showAuthError(data.error);
+      if (data.needs2fa) {
+        pending2faToken = data.partialToken;
+        authScreen = 'verify2fa';
+        renderAuth();
+        return;
+      }
+      authToken = data.token;
+      localStorage.setItem('authToken', authToken);
+      userProfile = data.profile;
+      onLoggedIn();
+    }
+
+    async function doRegister() {
+      const username = document.getElementById('regUsername')?.value?.trim();
+      const email = document.getElementById('regEmail')?.value?.trim();
+      const password = document.getElementById('regPassword')?.value;
+      if (!username || !email || !password) return showAuthError('Fill in all fields');
+      const data = await api('/register', { username, email, password });
+      if (data.error) return showAuthError(data.error);
+      authToken = data.token;
+      localStorage.setItem('authToken', authToken);
+      userProfile = data.profile;
+      onLoggedIn();
+    }
+
+    async function doVerify2fa() {
+      const code = document.getElementById('tfaCode')?.value?.trim();
+      if (!code || code.length !== 6) return showAuthError('Enter 6-digit code');
+      const data = await api('/verify-2fa', { partialToken: pending2faToken, code });
+      if (data.error) return showAuthError(data.error);
+      authToken = data.token;
+      localStorage.setItem('authToken', authToken);
+      userProfile = data.profile;
+      pending2faToken = null;
+      onLoggedIn();
+    }
+
+    function showAuthError(msg) {
+      const el = document.getElementById('authError');
+      if (el) el.innerHTML = `<p class="error-msg">${msg}</p>`;
+    }
+
+    async function doLogout() {
+      await api('/logout');
+      authToken = null;
+      userProfile = null;
+      localStorage.removeItem('authToken');
+      if (socket) socket.disconnect();
+      mySlot = -1;
+      currentState = null;
+      updateProfileBar();
+      toggleProfile();
+      authScreen = 'login';
+      renderAuth();
+    }
+
+    // ─── Profile modal ─────────────────────────────
+    function toggleProfile() {
+      const modal = document.getElementById('profileModal');
+      modal.classList.toggle('hidden');
+      if (!modal.classList.contains('hidden')) renderProfilePanel();
+    }
+
+    function toggleRules() {
+      document.getElementById('rulesModal').classList.toggle('hidden');
+    }
+
+    function renderProfilePanel() {
+      if (!userProfile) return;
+      const p = userProfile;
+      const wp = p.games_played ? Math.round(p.games_won / p.games_played * 100) : 0;
+      const panel = document.getElementById('profilePanel');
+
+      let twofaHTML = '';
+      if (p.totp_enabled) {
+        twofaHTML = `
+          <div class="twofa-section">
+            <div class="twofa-status">
+              <span>Two-Factor Auth</span>
+              <span class="twofa-badge on">Enabled</span>
+            </div>
+            <div class="form-group">
+              <label>Enter 2FA code to disable</label>
+              <input type="text" id="disable2faCode" placeholder="000000" maxlength="6">
+            </div>
+            <button class="btn-secondary" onclick="doDisable2fa()">Disable 2FA</button>
+            <div id="twofaError"></div>
+          </div>
+        `;
+      } else if (setup2faData) {
+        twofaHTML = `
+          <div class="twofa-section">
+            <div class="twofa-status">
+              <span>Two-Factor Auth</span>
+              <span class="twofa-badge off">Disabled</span>
+            </div>
+            <p style="color:#94a3b8;font-size:0.85rem;margin-bottom:8px;">Scan this QR code with your authenticator app:</p>
+            <div class="qr-container">
+              <img src="${setup2faData.qrDataUrl}" width="180" height="180" alt="QR Code">
+              <div class="secret-code">Manual key: ${setup2faData.secret}</div>
+            </div>
+            <div class="form-group">
+              <label>Enter the 6-digit code to verify</label>
+              <input type="text" id="enable2faCode" placeholder="000000" maxlength="6">
+            </div>
+            <button class="btn-primary" onclick="doEnable2fa()">Activate 2FA</button>
+            <button class="btn-secondary" onclick="setup2faData=null;renderProfilePanel()">Cancel</button>
+            <div id="twofaError"></div>
+          </div>
+        `;
+      } else {
+        twofaHTML = `
+          <div class="twofa-section">
+            <div class="twofa-status">
+              <span>Two-Factor Auth</span>
+              <span class="twofa-badge off">Disabled</span>
+            </div>
+            <button class="btn-secondary" onclick="doSetup2fa()">Set Up 2FA</button>
+            <div id="twofaError"></div>
+          </div>
+        `;
+      }
+
+      panel.innerHTML = `
+        <button class="modal-close" onclick="toggleProfile()">&times;</button>
+        <h2>${p.avatar || '😀'} ${p.username}</h2>
+        <div class="profile-stats">
+          <div class="stat-card">
+            <div class="stat-value">${p.games_played}</div>
+            <div class="stat-label">Games</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${p.games_won}</div>
+            <div class="stat-label">Wins</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${wp}%</div>
+            <div class="stat-label">Win Rate</div>
+          </div>
+        </div>
+        <div class="section-label">Avatar</div>
+        <div class="emoji-picker">
+          ${AVATARS.map(e => `<div class="emoji-option ${p.avatar === e ? 'selected' : ''}" onclick="pickAvatar('${e}')">${e}</div>`).join('')}
+        </div>
+        ${twofaHTML}
+        <button class="btn-secondary" style="margin-top:16px;color:#f87171;border-color:#7f1d1d" onclick="doLogout()">Log Out</button>
+      `;
+    }
+
+    async function pickAvatar(emoji) {
+      const data = await api('/avatar', { avatar: emoji });
+      if (data.profile) {
+        userProfile = data.profile;
+        updateProfileBar();
+        renderProfilePanel();
+      }
+    }
+
+    async function doSetup2fa() {
+      const data = await api('/setup-2fa');
+      if (data.error) { show2faError(data.error); return; }
+      setup2faData = data;
+      renderProfilePanel();
+    }
+
+    async function doEnable2fa() {
+      const code = document.getElementById('enable2faCode')?.value?.trim();
+      if (!code || code.length !== 6) return show2faError('Enter 6-digit code');
+      const data = await api('/enable-2fa', { secret: setup2faData.secret, code });
+      if (data.error) return show2faError(data.error);
+      userProfile = data.profile;
+      setup2faData = null;
+      updateProfileBar();
+      renderProfilePanel();
+    }
+
+    async function doDisable2fa() {
+      const code = document.getElementById('disable2faCode')?.value?.trim();
+      if (!code || code.length !== 6) return show2faError('Enter 6-digit code');
+      const data = await api('/disable-2fa', { code });
+      if (data.error) return show2faError(data.error);
+      userProfile = data.profile;
+      updateProfileBar();
+      renderProfilePanel();
+    }
+
+    function show2faError(msg) {
+      const el = document.getElementById('twofaError');
+      if (el) el.innerHTML = `<p class="error-msg">${msg}</p>`;
+    }
+
+    // ─── Game rendering ────────────────────────────
     function getDisplayName(slot, state) {
       if (!state || !state.slotNames) return 'Player ' + (slot + 1);
       return state.slotNames[slot] || ('Player ' + (slot + 1));
     }
 
-    socket.on('state', (state) => {
-      currentState = state;
-      mySlot = state.mySlot;
-      render(state);
-    });
+    function getTeamClass(slot) {
+      return (slot === 0 || slot === 3) ? 'team1' : 'team2';
+    }
 
-    socket.on('tick', (timeLeft) => {
-      // Lightweight timer update - no full re-render
-      const timerEl = document.querySelector('.timer');
-      if (timerEl) {
-        timerEl.textContent = timeLeft + 's';
-        timerEl.className = 'timer' + (timeLeft > 10 ? ' safe' : '');
-      }
-    });
+    function getSlotProfile(slot, state) {
+      if (!state || !state.slotProfiles) return null;
+      return state.slotProfiles[slot];
+    }
 
-    socket.on('countdownTick', (secondsLeft) => {
-      const cdEl = document.querySelector('.countdown-timer');
-      if (cdEl) {
-        const mins = Math.floor(secondsLeft / 60);
-        const secs = secondsLeft % 60;
-        cdEl.textContent = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
-      }
-    });
-
-    socket.on('gameReset', () => {
-      // handled by state update
-    });
+    function profileMiniHTML(slot, state) {
+      const prof = getSlotProfile(slot, state);
+      if (!prof) return '';
+      const s = prof.stats || {};
+      const wp = s.games_played ? Math.round(s.games_won / s.games_played * 100) : 0;
+      return `
+        <div class="player-avatar">${prof.avatar || '😀'}</div>
+        <div class="player-stats-mini">${s.games_won || 0}W / ${s.games_played || 0}G (${wp}%)</div>
+      `;
+    }
 
     function render(state) {
       const app = document.getElementById('app');
-
       if (state.phase === 'waiting' || state.phase === 'countdown') {
         renderWaiting(app, state);
         return;
       }
-
       if (state.phase === 'gameOver') {
         renderGameOver(app, state);
         return;
       }
-
       renderGame(app, state);
     }
 
@@ -800,23 +1502,20 @@
         `;
       }
 
+      // For name input: if logged in, use username; otherwise show input
+      const nameValue = userProfile ? userProfile.username : myName;
+      const nameDisabled = userProfile ? 'disabled' : '';
+
       app.innerHTML = `
         <div class="waiting-screen">
           <h1>Asocijacije</h1>
           <p class="subtitle">${isCountdown ? 'Get ready!' : `Waiting for players... (${slots.filter(s => s).length}/4)`}</p>
-          ${!hasJoined && !isCountdown ? `
+          ${!hasJoined ? `
             <div class="name-input-row">
               <label>Your name:</label>
-              <input type="text" id="nameInput" placeholder="Enter your name..." maxlength="20" value="${myName}">
+              <input type="text" id="nameInput" placeholder="Enter your name..." maxlength="20" value="${nameValue}" ${nameDisabled}>
             </div>
-            <p class="status-text" style="margin-bottom:16px">Click an empty slot to join</p>
-          ` : ''}
-          ${!hasJoined && isCountdown ? `
-            <div class="name-input-row">
-              <label>Your name:</label>
-              <input type="text" id="nameInput" placeholder="Enter your name..." maxlength="20" value="${myName}">
-            </div>
-            <p class="status-text" style="margin-bottom:16px">Hurry! Pick a slot before the timer runs out</p>
+            <p class="status-text" style="margin-bottom:16px">${isCountdown ? 'Hurry! Pick a slot before the timer runs out' : 'Click an empty slot to join'}</p>
           ` : ''}
           <div class="slot-grid">
             ${slots.map((s, i) => {
@@ -825,11 +1524,16 @@
               const canJoin = !isTaken && !hasJoined;
               const displayName = state.slotNames[i] || ('Player ' + (i + 1));
               const isSlotAdmin = i === state.adminSlot;
+              const prof = getSlotProfile(i, state);
               return `
               <div class="slot-btn ${isTaken ? 'taken' : ''} ${isMe ? 'is-me' : ''} ${canJoin ? 'available' : ''}"
                 ${canJoin ? `onclick="joinSlot(${i})"` : ''}>
                 <div class="team-label ${teamClasses[i]}">${teamLabels[i]}</div>
-                ${isTaken ? `${displayName}${isSlotAdmin ? '<span class="admin-badge">Admin</span>' : ''} ${isMe ? '(You)' : ''}` : 'Open slot...'}
+                ${isTaken ? `
+                  ${prof ? `<div class="slot-avatar">${prof.avatar || '😀'}</div>` : ''}
+                  ${displayName}${isSlotAdmin ? '<span class="admin-badge">Admin</span>' : ''} ${isMe ? '(You)' : ''}
+                  ${prof ? `<div class="slot-stats">${(prof.stats?.games_won||0)}W / ${(prof.stats?.games_played||0)}G</div>` : ''}
+                ` : 'Open slot...'}
               </div>
             `}).join('')}
           </div>
@@ -838,7 +1542,7 @@
         </div>
       `;
 
-      if (!hasJoined) {
+      if (!hasJoined && !userProfile) {
         const nameInput = document.getElementById('nameInput');
         if (nameInput) nameInput.focus();
       }
@@ -848,8 +1552,7 @@
       const nameInput = document.getElementById('nameInput');
       const name = nameInput ? nameInput.value.trim() : '';
       if (!name) {
-        nameInput.style.borderColor = '#ef4444';
-        nameInput.focus();
+        if (nameInput) { nameInput.style.borderColor = '#ef4444'; nameInput.focus(); }
         return;
       }
       myName = name;
@@ -862,10 +1565,15 @@
       const winnerName = winner === 'team1' ? `Team Blue (${n[0] || 'P1'} & ${n[3] || 'P4'})` : `Team Gold (${n[1] || 'P2'} & ${n[2] || 'P3'})`;
       const winnerClass = winner === 'team1' ? 'winner-team1' : 'winner-team2';
 
+      // Refresh own profile if logged in (stats updated)
+      if (userProfile) {
+        apiGet('/me').then(d => { if (d.profile) { userProfile = d.profile; updateProfileBar(); } });
+      }
+
       app.innerHTML = `
         <div class="waiting-screen">
           <div class="game-over">
-            <h1 class="${winnerClass}">🏆 ${winnerName} Wins!</h1>
+            <h1 class="${winnerClass}">${winnerName} Wins!</h1>
             <div class="scoreboard">
               <span class="score team1">${state.scores.team1}</span>
               <span class="score-divider">:</span>
@@ -878,10 +1586,6 @@
       `;
     }
 
-    function getTeamClass(slot) {
-      return (slot === 0 || slot === 3) ? 'team1' : 'team2';
-    }
-
     function renderGame(app, state) {
       const ct = state.currentTurn;
       const phase = state.phase;
@@ -891,6 +1595,7 @@
         const isEmpty = !s;
         const isMe = slot === mySlot;
         const teamClass = getTeamClass(slot);
+        const prof = getSlotProfile(slot, state);
 
         let role = '';
         let roleHighlight = false;
@@ -920,20 +1625,27 @@
           (phase === 'guess' && slot === ct.guesser)
         );
 
+        let statsHTML = '';
+        if (prof && prof.stats) {
+          const s = prof.stats;
+          const wp = s.games_played ? Math.round(s.games_won / s.games_played * 100) : 0;
+          statsHTML = `<div class="player-stats-mini">${s.games_won}W / ${s.games_played}G (${wp}%)</div>`;
+        }
+
         return `
           <div class="player-corner ${position}">
             <div class="player-card ${teamClass} ${isEmpty ? 'empty' : ''} ${isMe ? 'is-me' : ''} ${isActive ? 'active' : ''}">
+              ${prof ? `<div class="player-avatar">${prof.avatar || '😀'}</div>` : ''}
               <div class="player-name">${getDisplayName(slot, state)}${isMe ? ' (You)' : ''}</div>
+              ${statsHTML}
               <div class="player-role ${roleHighlight ? 'highlight' : ''}">${role}</div>
             </div>
           </div>
         `;
       }
 
-      // Center content
       let centerHTML = '';
 
-      // Scoreboard
       centerHTML += `
         <div class="scoreboard">
           <span class="score team1">${state.scores.team1}</span>
@@ -942,12 +1654,10 @@
         </div>
       `;
 
-      // Secret word (if visible to me)
       if (state.secretWord) {
         centerHTML += `<div class="secret-word-display">Secret: ${state.secretWord}</div>`;
       }
 
-      // Clues
       if (state.clues.length > 0) {
         centerHTML += `<div class="clue-list">`;
         state.clues.forEach(c => {
@@ -966,13 +1676,11 @@
         centerHTML += `</div>`;
       }
 
-      // Timer
       if (phase === 'guess') {
         const safe = state.timeLeft > 10;
         centerHTML += `<div class="timer ${safe ? 'safe' : ''}">${state.timeLeft}s</div>`;
       }
 
-      // Status + Input
       if (phase === 'secret') {
         if (mySlot === ct.secretHolder) {
           centerHTML += `
@@ -1013,7 +1721,7 @@
           centerHTML += `<p class="status-text">${getDisplayName(ct.guesser, state)} is guessing...</p>`;
         }
       } else if (phase === 'roundOver') {
-        centerHTML += `<div class="round-over-msg">✅ Correct! Point scored!</div>`;
+        centerHTML += `<div class="round-over-msg">Correct! Point scored!</div>`;
       }
 
       app.innerHTML = `
@@ -1026,14 +1734,13 @@
         </div>
       `;
 
-      // Auto-focus input
       const input = document.querySelector('.input-area input');
       if (input) input.focus();
     }
 
     function getReceiver(state) {
-      if (state.roundStarter === 0) return 1; // P1 -> P2
-      return 3; // P2 -> P4
+      if (state.roundStarter === 0) return 1;
+      return 3;
     }
 
     function submitSecret() {
@@ -1059,6 +1766,9 @@
         input.value = '';
       }
     }
+
+    // ─── Init ──────────────────────────────────────
+    tryAutoLogin();
   </script>
 </body>
 </html>

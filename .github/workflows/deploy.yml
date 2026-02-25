@@ -7,6 +7,8 @@ on:
       - master
     paths:
       - 'server.js'
+      - 'db.js'
+      - 'auth.js'
       - 'public/**'
       - 'package.json'
       - 'package-lock.json'
@@ -59,6 +61,13 @@ jobs:
           --namespace=asocijacije \
           --dry-run=client -o yaml | kubectl apply -f -
 
+    - name: Create app secrets
+      run: |
+        kubectl create secret generic asocijacije-secrets \
+          --from-literal=jwt-secret=${{ secrets.JWT_SECRET }} \
+          --namespace=asocijacije \
+          --dry-run=client -o yaml | kubectl apply -f -
+
     - name: Deploy to DigitalOcean Kubernetes
       run: |
         TAG=$(echo $GITHUB_SHA | head -c7)
@@ -71,6 +80,7 @@ jobs:
 
         # Apply all manifests in correct order
         kubectl apply -f k8s/namespace.yaml
+        kubectl apply -f k8s/pvc.yaml
         kubectl apply -f k8s/service.yaml
         kubectl apply -f k8s/deployment-temp.yaml
         kubectl apply -f k8s/ingress.yaml
