@@ -988,6 +988,25 @@
       color: #64748b;
       margin-top: 2px;
     }
+
+    /* Disconnected player indicator */
+    .player-card.disconnected {
+      opacity: 0.5;
+      border-style: dashed !important;
+    }
+
+    .disconnected-badge {
+      font-size: 0.7rem;
+      color: #f87171;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .slot-btn .disconnected-badge {
+      font-size: 0.7rem;
+      color: #f87171;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -1050,19 +1069,41 @@
     let mySlot = -1;
     let myName = '';
     let currentState = null;
+    let lastRenderedPhase = null;
 
     function connectSocket() {
       if (socket) socket.disconnect();
-      socket = io({ auth: { token: authToken } });
+      const reconnectToken = sessionStorage.getItem('reconnectToken') || null;
+      socket = io({ auth: { token: authToken, reconnectToken } });
 
       socket.on('assigned', (data) => {
         mySlot = data.slot;
         myName = data.name;
+        if (data.reconnectToken) {
+          sessionStorage.setItem('reconnectToken', data.reconnectToken);
+        }
       });
 
       socket.on('state', (state) => {
+        const prevPhase = currentState?.phase;
         currentState = state;
         mySlot = state.mySlot;
+
+        // Skip full re-render if user is actively typing and phase hasn't changed
+        // This prevents mobile keyboard from being dismissed
+        const activeEl = document.activeElement;
+        const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+        const inputId = activeEl?.id;
+        const isGameInput = inputId === 'secretInput' || inputId === 'clueInput' || inputId === 'guessInput';
+        if (isTyping && isGameInput && prevPhase === state.phase) {
+          // Just update non-input parts (scores, timer, clues, player cards)
+          updateScoreboard(state);
+          updatePlayerCards(state);
+          lastRenderedPhase = state.phase;
+          return;
+        }
+
+        lastRenderedPhase = state.phase;
         render(state);
       });
 
@@ -1448,6 +1489,37 @@
       `;
     }
 
+    // Lightweight partial updates (avoid full re-render)
+    function updateScoreboard(state) {
+      const s1 = document.querySelector('.score.team1');
+      const s2 = document.querySelector('.score.team2');
+      if (s1) s1.textContent = state.scores.team1;
+      if (s2) s2.textContent = state.scores.team2;
+    }
+
+    function updatePlayerCards(state) {
+      // Update disconnected status on existing cards
+      document.querySelectorAll('.player-card').forEach(card => {
+        const slot = parseInt(card.dataset.slot);
+        if (isNaN(slot)) return;
+        const slotInfo = state.slots[slot];
+        if (slotInfo && slotInfo.disconnected) {
+          card.classList.add('disconnected');
+          let badge = card.querySelector('.disconnected-badge');
+          if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'disconnected-badge';
+            badge.textContent = 'Disconnected';
+            card.appendChild(badge);
+          }
+        } else {
+          card.classList.remove('disconnected');
+          const badge = card.querySelector('.disconnected-badge');
+          if (badge) badge.remove();
+        }
+      });
+    }
+
     function render(state) {
       const app = document.getElementById('app');
       if (state.phase === 'waiting' || state.phase === 'countdown') {
@@ -1533,6 +1605,7 @@
                   ${prof ? `<div class="slot-avatar">${prof.avatar || '😀'}</div>` : ''}
                   ${displayName}${isSlotAdmin ? '<span class="admin-badge">Admin</span>' : ''} ${isMe ? '(You)' : ''}
                   ${prof ? `<div class="slot-stats">${(prof.stats?.games_won||0)}W / ${(prof.stats?.games_played||0)}G</div>` : ''}
+                  ${s && s.disconnected ? '<div class="disconnected-badge">Disconnected</div>' : ''}
                 ` : 'Open slot...'}
               </div>
             `}).join('')}
@@ -1632,12 +1705,16 @@
           statsHTML = `<div class="player-stats-mini">${s.games_won}W / ${s.games_played}G (${wp}%)</div>`;
         }
 
+        const slotInfo = state.slots[slot];
+        const isDisconnected = slotInfo && slotInfo.disconnected;
+
         return `
           <div class="player-corner ${position}">
-            <div class="player-card ${teamClass} ${isEmpty ? 'empty' : ''} ${isMe ? 'is-me' : ''} ${isActive ? 'active' : ''}">
+            <div class="player-card ${teamClass} ${isEmpty && !isDisconnected ? 'empty' : ''} ${isMe ? 'is-me' : ''} ${isActive ? 'active' : ''} ${isDisconnected ? 'disconnected' : ''}" data-slot="${slot}">
               ${prof ? `<div class="player-avatar">${prof.avatar || '😀'}</div>` : ''}
               <div class="player-name">${getDisplayName(slot, state)}${isMe ? ' (You)' : ''}</div>
               ${statsHTML}
+              ${isDisconnected ? '<div class="disconnected-badge">Disconnected</div>' : ''}
               <div class="player-role ${roleHighlight ? 'highlight' : ''}">${role}</div>
             </div>
           </div>
@@ -1687,6 +1764,7 @@
             <p class="status-text">Type the secret word (only ${getDisplayName(getReceiver(state), state)} will see it)</p>
             <div class="input-area">
               <input type="text" id="secretInput" placeholder="Secret word..." autofocus
+                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
                 onkeydown="if(event.key==='Enter')submitSecret()">
               <button onclick="submitSecret()">Set Word</button>
             </div>
@@ -1700,6 +1778,7 @@
             <p class="status-text">Type ONE word as a clue for ${getDisplayName(ct.guesser, state)}</p>
             <div class="input-area">
               <input type="text" id="clueInput" placeholder="One word clue..." autofocus
+                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
                 onkeydown="if(event.key==='Enter')submitClue()">
               <button onclick="submitClue()">Give Clue</button>
             </div>
@@ -1713,6 +1792,7 @@
             <p class="status-text">Guess the secret word!</p>
             <div class="input-area">
               <input type="text" id="guessInput" placeholder="Your guess..." autofocus
+                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
                 onkeydown="if(event.key==='Enter')submitGuess()">
               <button onclick="submitGuess()">Guess</button>
             </div>

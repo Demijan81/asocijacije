@@ -20,9 +20,11 @@ let game = createFreshGame();
 function createFreshGame() {
   return {
     players: {}, // socketId -> { slot: 0-3 or -1, name: string, userId: number|null, avatar: string, stats: {} }
-    slots: [null, null, null, null], // slot index 0-3 -> socketId
+    slots: [null, null, null, null], // slot index 0-3 -> socketId (null = empty, socketId = connected)
     slotNames: ['', '', '', ''], // custom names per slot
     slotProfiles: [null, null, null, null], // { userId, avatar, games_played, games_won } per slot
+    slotDisconnected: [false, false, false, false], // true if player disconnected but slot reserved
+    slotReserved: [null, null, null, null], // { userId, reconnectToken, name, avatar, stats, profile } for reconnect
     adminSlot: -1, // slot of the admin player (first to join)
     phase: 'waiting', // waiting | countdown | secret | clue | guess | roundOver | gameOver
     scores: { team1: 0, team2: 0 }, // team1 = P1+P4, team2 = P2+P3
@@ -34,6 +36,7 @@ function createFreshGame() {
     timer: null,
     timeLeft: 0,
     countdownLeft: 0, // seconds remaining in pre-game countdown
+    disconnectTimer: null, // timer for auto-skipping disconnected player's turn
   };
 }
 
@@ -101,7 +104,7 @@ function broadcastState() {
     const state = {
       phase: game.phase,
       scores: game.scores,
-      slots: game.slots.map((s, idx) => s ? { slot: idx, name: getSlotName(idx), connected: true } : null),
+      slots: game.slots.map((s, idx) => (s || game.slotDisconnected[idx]) ? { slot: idx, name: getSlotName(idx), connected: !!s && !game.slotDisconnected[idx], disconnected: game.slotDisconnected[idx] } : null),
       slotNames: game.slotNames,
       slotProfiles: game.slotProfiles,
       adminSlot: game.adminSlot,
@@ -138,7 +141,7 @@ function broadcastState() {
       io.to(sid).emit('state', {
         phase: game.phase,
         scores: game.scores,
-        slots: game.slots.map((s, idx) => s ? { slot: idx, name: getSlotName(idx), connected: true } : null),
+        slots: game.slots.map((s, idx) => (s || game.slotDisconnected[idx]) ? { slot: idx, name: getSlotName(idx), connected: !!s && !game.slotDisconnected[idx], disconnected: game.slotDisconnected[idx] } : null),
         slotNames: game.slotNames,
         slotProfiles: game.slotProfiles,
         adminSlot: game.adminSlot,
@@ -187,6 +190,7 @@ function startClueTurn() {
   const config = getRoundConfig(game.roundStarter, game.turnWithinRound);
   game.phase = 'clue';
   broadcastState();
+  checkDisconnectedTurn();
 }
 
 function startNewRound() {
@@ -195,6 +199,7 @@ function startNewRound() {
   game.turnWithinRound = 0;
   game.phase = 'secret';
   broadcastState();
+  checkDisconnectedTurn();
 }
 
 function checkWin() {
@@ -243,13 +248,85 @@ function resolveUser(socket) {
   return stmts.getProfile.get(decoded.userId) || null;
 }
 
+// Auto-skip turn if active player is disconnected
+function checkDisconnectedTurn() {
+  if (game.disconnectTimer) { clearTimeout(game.disconnectTimer); game.disconnectTimer = null; }
+  if (game.phase !== 'secret' && game.phase !== 'clue' && game.phase !== 'guess') return;
+
+  const config = getRoundConfig(game.roundStarter, game.turnWithinRound);
+  let activeSlot = -1;
+  if (game.phase === 'secret') activeSlot = config.secretHolder;
+  else if (game.phase === 'clue') activeSlot = config.clueGiver;
+  else if (game.phase === 'guess') activeSlot = config.guesser;
+
+  if (activeSlot >= 0 && game.slotDisconnected[activeSlot]) {
+    // Give them 15 seconds to reconnect, then auto-skip
+    game.disconnectTimer = setTimeout(() => {
+      game.disconnectTimer = null;
+      if (!game.slotDisconnected[activeSlot]) return; // they reconnected
+      console.log(`Auto-skipping turn for disconnected slot ${activeSlot}`);
+      if (game.phase === 'secret') {
+        // Can't skip secret - set a placeholder and move on
+        game.secretWord = '???';
+        game.phase = 'clue';
+        broadcastState();
+      } else if (game.phase === 'clue') {
+        // Skip to next turn
+        game.turnWithinRound++;
+        startClueTurn();
+      } else if (game.phase === 'guess') {
+        clearTimer();
+        game.turnWithinRound++;
+        startClueTurn();
+      }
+    }, 15000);
+  }
+}
+
 io.on('connection', (socket) => {
   console.log(`Connected: ${socket.id}`);
 
   const authUser = resolveUser(socket);
-  game.players[socket.id] = { slot: -1, name: '', userId: authUser?.id || null, avatar: authUser?.avatar || null, stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : null };
-  socket.emit('assigned', { slot: -1, name: 'Spectator' });
-  broadcastState();
+  const reconnectToken = socket.handshake.auth?.reconnectToken || null;
+
+  // Check if this player can reconnect to a reserved slot
+  let reconnectedSlot = -1;
+  for (let i = 0; i < 4; i++) {
+    if (!game.slotDisconnected[i]) continue;
+    const res = game.slotReserved[i];
+    if (!res) continue;
+    // Match by userId (logged in) or reconnectToken (guest)
+    if ((authUser && res.userId && authUser.id === res.userId) ||
+        (reconnectToken && res.reconnectToken && reconnectToken === res.reconnectToken)) {
+      // Reconnect!
+      reconnectedSlot = i;
+      game.slots[i] = socket.id;
+      game.slotDisconnected[i] = false;
+      game.players[socket.id] = {
+        slot: i, name: res.name,
+        userId: authUser?.id || res.userId || null,
+        avatar: authUser?.avatar || res.avatar || null,
+        stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : res.stats || null
+      };
+      if (authUser) {
+        game.slotProfiles[i] = { userId: authUser.id, avatar: authUser.avatar, stats: { games_played: authUser.games_played, games_won: authUser.games_won } };
+      }
+      console.log(`Player reconnected to slot ${i}: ${res.name}`);
+      socket.emit('assigned', { slot: i, name: res.name, reconnectToken: res.reconnectToken });
+      // Cancel disconnect timer if it was for this slot
+      if (game.disconnectTimer) { clearTimeout(game.disconnectTimer); game.disconnectTimer = null; }
+      broadcastState();
+      // Re-check if the active turn needs attention
+      checkDisconnectedTurn();
+      break;
+    }
+  }
+
+  if (reconnectedSlot === -1) {
+    game.players[socket.id] = { slot: -1, name: '', userId: authUser?.id || null, avatar: authUser?.avatar || null, stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : null };
+    socket.emit('assigned', { slot: -1, name: 'Spectator' });
+    broadcastState();
+  }
 
   // Player picks a slot and sets their name
   socket.on('joinSlot', ({ slot, name }) => {
@@ -267,16 +344,28 @@ io.on('connection', (socket) => {
     const trimmedName = (name || '').trim().substring(0, 20) || `Player ${slot + 1}`;
     game.slots[slot] = socket.id;
     game.slotNames[slot] = trimmedName;
+    game.slotDisconnected[slot] = false;
     const playerData = game.players[socket.id];
     game.players[socket.id] = { slot, name: trimmedName, userId: playerData?.userId || null, avatar: playerData?.avatar || null, stats: playerData?.stats || null };
     game.slotProfiles[slot] = playerData?.userId ? { userId: playerData.userId, avatar: playerData.avatar, stats: playerData.stats } : null;
+
+    // Generate reconnect token for guests
+    const rToken = playerData?.userId ? null : Math.random().toString(36).substring(2) + Date.now().toString(36);
+    game.slotReserved[slot] = {
+      userId: playerData?.userId || null,
+      reconnectToken: rToken,
+      name: trimmedName,
+      avatar: playerData?.avatar || null,
+      stats: playerData?.stats || null,
+      profile: game.slotProfiles[slot]
+    };
 
     // First player to join becomes admin
     if (game.adminSlot === -1) {
       game.adminSlot = slot;
     }
 
-    socket.emit('assigned', { slot, name: trimmedName });
+    socket.emit('assigned', { slot, name: trimmedName, reconnectToken: rToken });
     broadcastState();
   });
 
@@ -373,6 +462,7 @@ io.on('connection', (socket) => {
     game.phase = 'guess';
     startGuessTimer();
     broadcastState();
+    checkDisconnectedTurn();
   });
 
   // Guess submission (from guesser)
@@ -421,18 +511,21 @@ io.on('connection', (socket) => {
   // Reset game
   socket.on('resetGame', () => {
     clearTimer();
+    if (game.disconnectTimer) { clearTimeout(game.disconnectTimer); game.disconnectTimer = null; }
     const oldSlots = [...game.slots];
     const oldNames = [...game.slotNames];
     const oldProfiles = [...game.slotProfiles];
+    const oldReserved = [...game.slotReserved];
     const oldPlayers = { ...game.players };
     const oldAdmin = game.adminSlot;
     game = createFreshGame();
-    // Re-assign connected players
+    // Re-assign connected players (drop disconnected slots on reset)
     for (let i = 0; i < 4; i++) {
       if (oldSlots[i] && io.sockets.sockets.get(oldSlots[i])) {
         game.slots[i] = oldSlots[i];
         game.slotNames[i] = oldNames[i];
         game.slotProfiles[i] = oldProfiles[i];
+        game.slotReserved[i] = oldReserved[i];
         const op = oldPlayers[oldSlots[i]];
         game.players[oldSlots[i]] = { slot: i, name: oldNames[i], userId: op?.userId || null, avatar: op?.avatar || null, stats: op?.stats || null };
       }
@@ -452,22 +545,66 @@ io.on('connection', (socket) => {
     console.log(`Disconnected: ${socket.id}`);
     const player = game.players[socket.id];
     if (player && player.slot >= 0) {
-      const wasAdmin = player.slot === game.adminSlot;
-      game.slots[player.slot] = null;
-      game.slotNames[player.slot] = '';
-      game.slotProfiles[player.slot] = null;
-      clearTimer();
-      if (game.phase !== 'waiting' && game.phase !== 'gameOver') {
-        game.phase = 'waiting';
-        game.countdownLeft = 0;
-      }
-      // Transfer admin to next connected player
-      if (wasAdmin) {
-        game.adminSlot = -1;
-        for (let i = 0; i < 4; i++) {
-          if (game.slots[i] !== null) {
-            game.adminSlot = i;
-            break;
+      const slot = player.slot;
+      const wasAdmin = slot === game.adminSlot;
+      const isGameActive = game.phase !== 'waiting' && game.phase !== 'gameOver' && game.phase !== 'countdown';
+
+      if (isGameActive) {
+        // Keep slot reserved, mark as disconnected - game continues
+        game.slots[slot] = null;
+        game.slotDisconnected[slot] = true;
+        // slotNames, slotProfiles, slotReserved stay intact
+        console.log(`Slot ${slot} (${player.name}) disconnected - slot reserved for reconnect`);
+
+        // Transfer admin to next connected player
+        if (wasAdmin) {
+          game.adminSlot = -1;
+          for (let i = 0; i < 4; i++) {
+            if (game.slots[i] !== null && !game.slotDisconnected[i]) {
+              game.adminSlot = i;
+              break;
+            }
+          }
+        }
+
+        // Check if ALL players are disconnected
+        const anyConnected = game.slots.some(s => s !== null);
+        if (!anyConnected) {
+          // Everyone left - reset to waiting
+          clearTimer();
+          if (game.disconnectTimer) { clearTimeout(game.disconnectTimer); game.disconnectTimer = null; }
+          game.phase = 'waiting';
+          game.countdownLeft = 0;
+          for (let i = 0; i < 4; i++) {
+            game.slotDisconnected[i] = false;
+            game.slotReserved[i] = null;
+            game.slotNames[i] = '';
+            game.slotProfiles[i] = null;
+          }
+        } else {
+          // Check if we need to auto-skip the disconnected player's turn
+          checkDisconnectedTurn();
+        }
+      } else {
+        // In waiting/countdown/gameOver - fully release the slot
+        game.slots[slot] = null;
+        game.slotNames[slot] = '';
+        game.slotProfiles[slot] = null;
+        game.slotDisconnected[slot] = false;
+        game.slotReserved[slot] = null;
+        if (game.phase === 'countdown') {
+          clearTimer();
+          game.phase = 'waiting';
+          game.countdownLeft = 0;
+        }
+        // Transfer admin
+        if (wasAdmin) {
+          game.adminSlot = -1;
+          for (let i = 0; i < 4; i++) {
+            if (game.slots[i] !== null) {
+              game.adminSlot = i;
+              break;
+            }
           }
         }
       }
