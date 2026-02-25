@@ -31,8 +31,8 @@ function generateCode() {
 // Teams: P1(slot0) + P4(slot3) = team1, P2(slot1) + P3(slot2) = team2
 // Round rotation (circular): P1→P2→P3→P4→P1→...
 // Pattern: secretHolder=S, receiver=R=(S+1)%4
-//   Clue givers alternate: R, S, R, S...
-//   Guessers alternate: (R+1)%4, (R+2)%4, (R+1)%4, (R+2)%4...
+//   Even turns: R clues → (S+3)%4 guesses (receiver's teammate guesses)
+//   Odd turns:  S clues → (S+2)%4 guesses (secretHolder's teammate guesses)
 
 function getTeam(slot) {
   return (slot === 0 || slot === 3) ? 'team1' : 'team2';
@@ -41,8 +41,10 @@ function getTeam(slot) {
 function getRoundConfig(roundStarter, turnWithinRound) {
   const S = roundStarter;
   const R = (S + 1) % 4;
+  // Even turns: receiver clues, opposite-team partner guesses
+  // Odd turns:  secretHolder clues, their teammate guesses
   const clueGiver = (turnWithinRound % 2 === 0) ? R : S;
-  const guesser = (turnWithinRound % 2 === 0) ? (R + 1) % 4 : (R + 2) % 4;
+  const guesser   = (turnWithinRound % 2 === 0) ? (S + 3) % 4 : (S + 2) % 4;
   return { secretHolder: S, receiver: R, clueGiver, guesser };
 }
 
@@ -892,7 +894,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Lobby chat
+  // Room chat (all phases)
   socket.on('sendChat', ({ message } = {}) => {
     const code = socketRooms.get(socket.id);
     if (!code || !message) return;
@@ -900,8 +902,6 @@ io.on('connection', (socket) => {
     if (!room) return;
     const player = room.players[socket.id];
     if (!player) return;
-    // Only allow chat in lobby/countdown phases
-    if (room.phase !== 'lobby' && room.phase !== 'waiting' && room.phase !== 'countdown') return;
     const text = String(message).trim().substring(0, 200);
     if (!text) return;
     room.emitToRoom('chatMessage', { name: player.name, text, timestamp: Date.now() });
