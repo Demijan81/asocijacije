@@ -23,7 +23,7 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       grid-template-rows: 1fr auto 1fr;
-      height: calc(100vh - 120px);
+      height: 100vh;
       gap: 0;
     }
 
@@ -1569,7 +1569,7 @@
         currentRoomCode = data.code;
         mySlot = data.slot ?? -1;
         myName = data.name || '';
-        chatMessages = [];
+        // Don't clear chatMessages here — they persist in lobby
         if (data.reconnectToken) sessionStorage.setItem('reconnectToken', data.reconnectToken);
         if (userProfile) socket.emit('listFriends');
         // Update URL with permanent room link
@@ -1580,6 +1580,8 @@
       socket.on('roomState', (state) => {
         currentRoomState = state;
         mySlot = state.mySlot;
+        // Load persistent chat history from server
+        if (state.chatHistory) chatMessages = state.chatHistory;
         if (screen !== 'game') {
           screen = 'room';
           renderRoomLobby(state);
@@ -2097,6 +2099,7 @@
 
       let adminHTML = '';
       if (isAdmin && !isCountdown) {
+        const isTestAdmin = userProfile && userProfile.email === 'demijan81@gmail.com';
         adminHTML = `
           <div class="admin-controls">
             <span class="admin-title">Admin Controls</span>
@@ -2108,6 +2111,7 @@
               <button class="btn-countdown" onclick="socket.emit('startCountdown', 300)">5 min</button>
             </div>
             ${!allFilled ? '<p style="color:#64748b;font-size:0.85rem">Start Now requires all 4 slots. Use countdown to wait for players.</p>' : ''}
+            ${isTestAdmin && !allFilled ? '<button class="btn-countdown" style="margin-top:8px;background:#7c3aed" onclick="socket.emit(\'testFillSlots\')">🤖 Fill with Bots</button>' : ''}
           </div>`;
       }
 
@@ -2356,18 +2360,6 @@
         </div>`;
       }).join('');
 
-      const goChatHTML = `
-        <div class="lobby-chat" style="max-width:380px;margin-top:16px">
-          <h4>Chat</h4>
-          <div class="chat-messages" id="chatMessages">${chatMessages.map(m => `<div class="chat-msg"><span class="chat-name">${m.name}:</span>${m.text}</div>`).join('')}</div>
-          <div class="chat-input-row">
-            <input type="text" id="chatInput" placeholder="Chat..." maxlength="200" autocomplete="off" enterkeyhint="send"
-              onkeydown="if(event.key==='Enter'){doSendChat();event.preventDefault()}"
-              onkeypress="if(event.keyCode===13){doSendChat();event.preventDefault()}">
-            <button onclick="doSendChat()" type="button">Send</button>
-          </div>
-        </div>`;
-
       app.innerHTML = `
         <div class="waiting-screen">
           <div class="game-over">
@@ -2375,11 +2367,8 @@
             <div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div>
             <div class="gameover-players">${playersHTML}</div>
             <button class="btn-reset" onclick="socket.emit('resetGame')">Play Again</button>
-            ${goChatHTML}
           </div>
         </div>`;
-      const chatEl = document.getElementById('chatMessages');
-      if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
     }
 
     function renderGame(app, state) {
@@ -2447,22 +2436,33 @@
         centerHTML += '<div class="round-over-msg">Correct! Point scored!</div>';
       }
 
-      const chatHTML = `
-        <div class="lobby-chat" style="max-width:100%;margin:0;border-radius:0;border-left:none;border-right:none;border-bottom:none">
-          <div class="chat-messages" id="chatMessages" style="height:80px">${chatMessages.map(m => `<div class="chat-msg"><span class="chat-name">${m.name}:</span>${m.text}</div>`).join('')}</div>
-          <div class="chat-input-row">
-            <input type="text" id="chatInput" placeholder="Chat..." maxlength="200" autocomplete="off" enterkeyhint="send"
-              onkeydown="if(event.key==='Enter'){doSendChat();event.preventDefault()}"
-              onkeypress="if(event.keyCode===13){doSendChat();event.preventDefault()}">
-            <button onclick="doSendChat()" type="button">Send</button>
-          </div>
-        </div>`;
+      // Test mode panel for admin
+      let testHTML = '';
+      if (userProfile && userProfile.email === 'demijan81@gmail.com' && ct) {
+        let activeSlot = -1;
+        let actionType = '';
+        if (phase === 'secret') { activeSlot = ct.secretHolder; actionType = 'submitSecret'; }
+        else if (phase === 'clue') { activeSlot = ct.clueGiver; actionType = 'submitClue'; }
+        else if (phase === 'guess') { activeSlot = ct.guesser; actionType = 'submitGuess'; }
+        if (activeSlot >= 0 && activeSlot !== mySlot && String(state.slots[activeSlot]?.name || '').startsWith('Bot')) {
+          testHTML = `<div style="position:fixed;bottom:8px;left:8px;right:8px;background:#1e1b4b;border:1px solid #7c3aed;border-radius:8px;padding:8px 12px;z-index:100;display:flex;align-items:center;gap:8px">
+            <span style="color:#a78bfa;font-size:0.8rem;white-space:nowrap">🤖 ${state.slotNames[activeSlot]} (${actionType.replace('submit','')}):</span>
+            <input type="text" id="testInput" placeholder="Type word..." style="flex:1;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:16px" autocomplete="off"
+              onkeydown="if(event.key==='Enter'){doTestAct(${activeSlot},'${actionType}');event.preventDefault()}"
+              onkeypress="if(event.keyCode===13){doTestAct(${activeSlot},'${actionType}');event.preventDefault()}">
+            <button onclick="doTestAct(${activeSlot},'${actionType}')" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:0.85rem;cursor:pointer">Go</button>
+          </div>`;
+        }
+      }
 
-      app.innerHTML = `<div class="game-container">${playerCard(0,'top-left')}${playerCard(1,'top-right')}<div class="center-area">${centerHTML}</div>${playerCard(2,'bottom-left')}${playerCard(3,'bottom-right')}</div>${chatHTML}`;
+      app.innerHTML = `<div class="game-container">${playerCard(0,'top-left')}${playerCard(1,'top-right')}<div class="center-area">${centerHTML}</div>${playerCard(2,'bottom-left')}${playerCard(3,'bottom-right')}</div>${testHTML}`;
       const input = document.querySelector('.input-area input');
       if (input) input.focus();
-      const chatEl = document.getElementById('chatMessages');
-      if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function doTestAct(slot, action) {
+      const i = document.getElementById('testInput');
+      if (i && i.value.trim()) { socket.emit('testActAs', { slot, action, value: i.value.trim() }); i.value = ''; }
     }
 
     function submitSecret() { const i=document.getElementById('secretInput'); if(i&&i.value.trim()){socket.emit('submitSecret',i.value.trim());i.value='';} }

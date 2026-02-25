@@ -65,6 +65,7 @@ class Room {
     this.slotProfiles = [null, null, null, null];
     this.slotDisconnected = [false, false, false, false];
     this.slotReserved = [null, null, null, null];
+    this.chatHistory = []; // persistent chat messages
     this.adminSlot = -1;
     this.phase = 'lobby'; // lobby | waiting | countdown | secret | clue | guess | roundOver | gameOver
     this.scores = { team1: 0, team2: 0 };
@@ -106,6 +107,7 @@ class Room {
       slotNames: this.slotNames,
       slotProfiles: this.slotProfiles,
       adminSlot: this.adminSlot,
+      chatHistory: this.chatHistory,
     };
     for (const [sid, player] of Object.entries(this.players)) {
       io.to(sid).emit('roomState', { ...lobbyState, mySlot: player.slot });
@@ -317,7 +319,7 @@ class Room {
 
   joinSlot(socketId, slot, name) {
     if (slot < 0 || slot > 3) return null;
-    if (this.slots[slot] !== null) return null;
+    if (this.slots[slot] !== null || this.slotDisconnected[slot]) return null;
     if (this.phase !== 'lobby' && this.phase !== 'waiting' && this.phase !== 'countdown') return null;
 
     const player = this.players[socketId];
@@ -894,7 +896,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Room chat (all phases)
+  // Lobby chat (persisted on room)
   socket.on('sendChat', ({ message } = {}) => {
     const code = socketRooms.get(socket.id);
     if (!code || !message) return;
@@ -902,9 +904,55 @@ io.on('connection', (socket) => {
     if (!room) return;
     const player = room.players[socket.id];
     if (!player) return;
+    if (room.phase !== 'lobby' && room.phase !== 'waiting' && room.phase !== 'countdown') return;
     const text = String(message).trim().substring(0, 200);
     if (!text) return;
-    room.emitToRoom('chatMessage', { name: player.name, text, timestamp: Date.now() });
+    const msg = { name: player.name, text, timestamp: Date.now() };
+    room.chatHistory.push(msg);
+    if (room.chatHistory.length > 100) room.chatHistory.shift();
+    room.emitToRoom('chatMessage', msg);
+  });
+
+  // Admin test mode: fill empty slots with bots
+  socket.on('testFillSlots', () => {
+    if (!authUser) return;
+    const user = stmts.getProfile.get(authUser.id);
+    if (!user || user.email !== 'demijan81@gmail.com') return;
+    const code = socketRooms.get(socket.id);
+    if (!code) return;
+    const room = rooms.get(code);
+    if (!room) return;
+    if (room.phase !== 'lobby' && room.phase !== 'waiting') return;
+    const botNames = ['Bot-Alpha', 'Bot-Beta', 'Bot-Gamma', 'Bot-Delta'];
+    for (let i = 0; i < 4; i++) {
+      if (room.slots[i] !== null || room.slotDisconnected[i]) continue;
+      // Create a virtual bot in this slot
+      room.slots[i] = `bot_${i}`;
+      room.slotNames[i] = botNames[i];
+      room.slotDisconnected[i] = false;
+      room.slotProfiles[i] = null;
+      room.slotReserved[i] = { userId: null, reconnectToken: null, name: botNames[i], avatar: '🤖', stats: null, profile: null };
+      room.players[`bot_${i}`] = { slot: i, name: botNames[i], userId: null, avatar: '🤖', stats: null };
+      if (room.adminSlot === -1) room.adminSlot = i;
+    }
+    room.broadcastLobby();
+  });
+
+  // Admin test mode: act as any slot
+  socket.on('testActAs', ({ slot, action, value } = {}) => {
+    if (!authUser) return;
+    const user = stmts.getProfile.get(authUser.id);
+    if (!user || user.email !== 'demijan81@gmail.com') return;
+    const code = socketRooms.get(socket.id);
+    if (!code) return;
+    const room = rooms.get(code);
+    if (!room) return;
+    if (slot < 0 || slot > 3) return;
+    const botSid = room.slots[slot];
+    if (!botSid) return;
+    if (action === 'submitSecret') room.submitSecret(botSid, value);
+    else if (action === 'submitClue') room.submitClue(botSid, value);
+    else if (action === 'submitGuess') room.submitGuess(botSid, value);
   });
 
   // ─── Friend system ──────────────────────────────
