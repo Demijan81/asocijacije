@@ -735,31 +735,41 @@ io.on('connection', (socket) => {
 
   // Delete/cancel a room (creator only, lobby/countdown only)
   socket.on('deleteRoom', ({ code } = {}) => {
-    if (!code) return;
+    if (!code || !authUser) return;
+
     const room = rooms.get(code);
-    if (!room) return;
-    if (!authUser || room.createdBy !== authUser.id) {
-      socket.emit('error', { message: 'Only the room creator can delete this room' });
-      return;
-    }
-    if (room.phase !== 'lobby' && room.phase !== 'waiting' && room.phase !== 'countdown') {
-      socket.emit('error', { message: 'Cannot delete a room while a game is in progress' });
-      return;
+    if (room) {
+      // Room is live in memory
+      if (room.createdBy !== authUser.id) {
+        socket.emit('error', { message: 'Only the room creator can delete this room' });
+        return;
+      }
+      if (room.phase !== 'lobby' && room.phase !== 'waiting' && room.phase !== 'countdown') {
+        socket.emit('error', { message: 'Cannot delete a room while a game is in progress' });
+        return;
+      }
+
+      // Notify all players and kick them out
+      room.clearTimer();
+      if (room.disconnectTimer) clearTimeout(room.disconnectTimer);
+      if (room.scheduleTimer) clearTimeout(room.scheduleTimer);
+      for (const sid of Object.keys(room.players)) {
+        io.to(sid).emit('roomDeleted', { code, message: 'Room was deleted by the creator' });
+        io.to(sid).emit('leftRoom');
+        socketRooms.delete(sid);
+      }
+      rooms.delete(code);
     }
 
-    // Notify all players in the room and kick them out
-    room.clearTimer();
-    if (room.disconnectTimer) clearTimeout(room.disconnectTimer);
-    if (room.scheduleTimer) clearTimeout(room.scheduleTimer);
-    for (const sid of Object.keys(room.players)) {
-      io.to(sid).emit('roomDeleted', { code, message: 'Room was deleted by the creator' });
-      io.to(sid).emit('leftRoom');
-      socketRooms.delete(sid);
-    }
+    // Also delete from DB (handles DB-only rooms from previous sessions)
+    try { stmts.deleteRoom.run(code, authUser.id); } catch (e) {}
+    console.log(`[${code}] Room deleted by ${authUser.username}`);
 
-    rooms.delete(code);
-    try { stmts.deleteRoom.run(code); } catch (e) {}
-    console.log(`[${code}] Room deleted by creator`);
+    // Refresh the caller's room list
+    socket.emit('myRooms', stmts.getRoomsByUser.all(authUser.id).map(r => {
+      const live = rooms.get(r.code);
+      return { code: r.code, name: r.name, status: live ? live.phase : r.status, playerCount: live ? Object.keys(live.players).length : 0, createdAt: r.created_at };
+    }));
   });
 
   // Leave a room (back to home)

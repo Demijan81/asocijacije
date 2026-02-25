@@ -1767,7 +1767,6 @@
               <button class="btn-countdown" onclick="socket.emit('startCountdown', 300)">5 min</button>
             </div>
             ${!allFilled ? '<p style="color:#64748b;font-size:0.85rem">Start Now requires all 4 slots. Use countdown to wait for players.</p>' : ''}
-            ${isRoomOwner ? `<button class="btn-delete-room" onclick="doDeleteRoom('${state.code}')">Delete Room</button>` : ''}
           </div>`;
       }
 
@@ -1835,6 +1834,7 @@
           ${countdownHTML}
           ${scheduleHTML}
           ${adminHTML}
+          ${isRoomOwner && !isCountdown ? `<button class="btn-delete-room" onclick="doDeleteRoom('${state.code}')">Delete Room</button>` : ''}
         </div>`;
 
       if (!hasJoined && !userProfile) document.getElementById('nameInput')?.focus();
