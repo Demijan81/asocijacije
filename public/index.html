@@ -1819,8 +1819,7 @@
     }
 
     function getReceiver(state) {
-      if (state.roundStarter === 0) return 1;
-      return 3;
+      return (state.roundStarter + 1) % 4;
     }
 
     function submitSecret() {

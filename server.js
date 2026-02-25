@@ -31,7 +31,7 @@ function createFreshGame() {
     secretWord: null,
     clues: [],
     currentRound: null, // { secretHolder, clueGiver, guesser, otherGuesser }
-    roundStarter: 0, // which slot starts the round (0 or 1), alternates
+    roundStarter: 0, // which slot starts the round (0-3), cycles P1→P2→P3→P4→P1
     turnWithinRound: 0, // 0-based turn count within a round
     timer: null,
     timeLeft: 0,
@@ -41,31 +41,17 @@ function createFreshGame() {
 }
 
 // Teams: P1(slot0) + P4(slot3) = team1, P2(slot1) + P3(slot2) = team2
-// Round flow:
-//   roundStarter=0 (P1 starts): P1 whispers to P2, P2 gives clue, P3 guesses, then P1 clue, P4 guesses, ...
-//   roundStarter=1 (P2 starts): P2 whispers to P4 (wait, let me re-read)
+// Round rotation (circular): P1→P2→P3→P4→P1→...
+//   Round 0: P1 tells secret to P2. Clues: P2,P1,P2,P1... Guesses: P3,P4,P3,P4...
+//   Round 1: P2 tells secret to P3. Clues: P3,P2,P3,P2... Guesses: P4,P1,P4,P1...
+//   Round 2: P3 tells secret to P4. Clues: P4,P3,P4,P3... Guesses: P1,P2,P1,P2...
+//   Round 3: P4 tells secret to P1. Clues: P1,P4,P1,P4... Guesses: P2,P3,P2,P3...
 //
-// Actually re-reading the rules:
-//   Round A: P1 says secret word to P2 (only P2 sees). P2 types clue (all see). P3 guesses (30s).
-//            If miss: P1 types clue, P4 guesses (30s). Then P2 clue, P3 guess. Rotate clue-giver.
-//   Round B: P2 types secret word visible only to P4. P4 types clue for all. P1 guesses (30s).
-//            If miss: P2 clue, P3 guesses... wait, let me re-read again.
-//
-// "then when word is guessed that team gets a point and it rotates, now player 2 is typing a word 
-//  for guessing that is only visible to player 4 and he types one word for all to see and first 
-//  guess is for player 1"
-//
-// So Round B: P2 gives secret to P4. P4 gives clue. P1 guesses. If miss: P2 clue, P3 guesses. etc.
-//
-// Pattern:
-//   Round A: secretHolder=P1, receiver=P2. Clue givers alternate: P2, P1, P2, P1...
-//            Guessers alternate: P3, P4, P3, P4...
-//   Round B: secretHolder=P2, receiver=P4. Clue givers alternate: P4, P2, P4, P2...
-//            Guessers alternate: P1, P3, P1, P3...
+// Pattern: secretHolder=S, receiver=R=(S+1)%4
+//   Clue givers alternate: R, S, R, S...
+//   Guessers alternate: (R+1)%4, (R+2)%4, (R+1)%4, (R+2)%4...
 //
 // Scoring: The guesser's team gets the point.
-//   Round A: P3 (team2) or P4 (team1) guesses correctly -> their team scores.
-//   Round B: P1 (team1) or P3 (team2) guesses correctly -> their team scores.
 
 function getSlotName(slot) {
   return game.slotNames[slot] || `Player ${slot + 1}`;
@@ -78,18 +64,12 @@ function getTeam(slot) {
 }
 
 function getRoundConfig(roundStarter, turnWithinRound) {
-  // roundStarter: 0 = P1 starts, 1 = P2 starts
-  if (roundStarter === 0) {
-    // P1 is secret holder, P2 is receiver
-    const clueGiver = (turnWithinRound % 2 === 0) ? 1 : 0; // P2 first, then P1
-    const guesser = (turnWithinRound % 2 === 0) ? 2 : 3;   // P3 first, then P4
-    return { secretHolder: 0, clueGiver, guesser };
-  } else {
-    // P2 is secret holder, P4 is receiver
-    const clueGiver = (turnWithinRound % 2 === 0) ? 3 : 1; // P4 first, then P2
-    const guesser = (turnWithinRound % 2 === 0) ? 0 : 2;   // P1 first, then P3
-    return { secretHolder: 1, clueGiver, guesser };
-  }
+  // roundStarter: 0-3, cycles P1→P2→P3→P4→P1
+  const S = roundStarter;          // secret holder
+  const R = (S + 1) % 4;           // receiver (sees the secret)
+  const clueGiver = (turnWithinRound % 2 === 0) ? R : S;
+  const guesser = (turnWithinRound % 2 === 0) ? (R + 1) % 4 : (R + 2) % 4;
+  return { secretHolder: S, receiver: R, clueGiver, guesser };
 }
 
 function broadcastState() {
@@ -123,12 +103,8 @@ function broadcastState() {
 
     // Only show secret word to secret holder and the receiver
     if (game.secretWord && config) {
-      if (config.secretHolder === 0) {
-        // P1 secret holder, P2 receiver
-        if (i === 0 || i === 1) state.secretWord = game.secretWord;
-      } else {
-        // P2 secret holder, P4 receiver
-        if (i === 1 || i === 3) state.secretWord = game.secretWord;
+      if (i === config.secretHolder || i === config.receiver) {
+        state.secretWord = game.secretWord;
       }
     }
 
@@ -487,8 +463,8 @@ io.on('connection', (socket) => {
 
       if (checkWin()) return;
 
-      // Switch round starter
-      game.roundStarter = game.roundStarter === 0 ? 1 : 0;
+      // Switch round starter (cycle through all 4)
+      game.roundStarter = (game.roundStarter + 1) % 4;
 
       // Brief pause then new round
       game.phase = 'roundOver';
