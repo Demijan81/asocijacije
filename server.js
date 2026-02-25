@@ -5,6 +5,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const { router: authRouter, verifyToken } = require('./auth');
 const { stmts } = require('./db');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,208 +15,596 @@ app.use(cookieParser());
 app.use('/api/auth', authRouter);
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Game state
-let game = createFreshGame();
+// ─── Room Management ──────────────────────────────────
+const rooms = new Map(); // code -> Room instance
 
-function createFreshGame() {
-  return {
-    players: {}, // socketId -> { slot: 0-3 or -1, name: string, userId: number|null, avatar: string, stats: {} }
-    slots: [null, null, null, null], // slot index 0-3 -> socketId (null = empty, socketId = connected)
-    slotNames: ['', '', '', ''], // custom names per slot
-    slotProfiles: [null, null, null, null], // { userId, avatar, games_played, games_won } per slot
-    slotDisconnected: [false, false, false, false], // true if player disconnected but slot reserved
-    slotReserved: [null, null, null, null], // { userId, reconnectToken, name, avatar, stats, profile } for reconnect
-    adminSlot: -1, // slot of the admin player (first to join)
-    phase: 'waiting', // waiting | countdown | secret | clue | guess | roundOver | gameOver
-    scores: { team1: 0, team2: 0 }, // team1 = P1+P4, team2 = P2+P3
-    secretWord: null,
-    clues: [],
-    currentRound: null, // { secretHolder, clueGiver, guesser, otherGuesser }
-    roundStarter: 0, // which slot starts the round (0-3), cycles P1→P2→P3→P4→P1
-    turnWithinRound: 0, // 0-based turn count within a round
-    timer: null,
-    timeLeft: 0,
-    countdownLeft: 0, // seconds remaining in pre-game countdown
-    disconnectTimer: null, // timer for auto-skipping disconnected player's turn
-  };
+function generateCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code;
+  do {
+    code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  } while (rooms.has(code));
+  return code;
 }
 
 // Teams: P1(slot0) + P4(slot3) = team1, P2(slot1) + P3(slot2) = team2
 // Round rotation (circular): P1→P2→P3→P4→P1→...
-//   Round 0: P1 tells secret to P2. Clues: P2,P1,P2,P1... Guesses: P3,P4,P3,P4...
-//   Round 1: P2 tells secret to P3. Clues: P3,P2,P3,P2... Guesses: P4,P1,P4,P1...
-//   Round 2: P3 tells secret to P4. Clues: P4,P3,P4,P3... Guesses: P1,P2,P1,P2...
-//   Round 3: P4 tells secret to P1. Clues: P1,P4,P1,P4... Guesses: P2,P3,P2,P3...
-//
 // Pattern: secretHolder=S, receiver=R=(S+1)%4
 //   Clue givers alternate: R, S, R, S...
 //   Guessers alternate: (R+1)%4, (R+2)%4, (R+1)%4, (R+2)%4...
-//
-// Scoring: The guesser's team gets the point.
-
-function getSlotName(slot) {
-  return game.slotNames[slot] || `Player ${slot + 1}`;
-}
 
 function getTeam(slot) {
-  // slot 0 (P1) and slot 3 (P4) = team1
-  // slot 1 (P2) and slot 2 (P3) = team2
   return (slot === 0 || slot === 3) ? 'team1' : 'team2';
 }
 
 function getRoundConfig(roundStarter, turnWithinRound) {
-  // roundStarter: 0-3, cycles P1→P2→P3→P4→P1
-  const S = roundStarter;          // secret holder
-  const R = (S + 1) % 4;           // receiver (sees the secret)
+  const S = roundStarter;
+  const R = (S + 1) % 4;
   const clueGiver = (turnWithinRound % 2 === 0) ? R : S;
   const guesser = (turnWithinRound % 2 === 0) ? (R + 1) % 4 : (R + 2) % 4;
   return { secretHolder: S, receiver: R, clueGiver, guesser };
 }
 
-function broadcastState() {
-  const config = game.phase !== 'waiting' && game.phase !== 'gameOver' && game.phase !== 'countdown'
-    ? getRoundConfig(game.roundStarter, game.turnWithinRound)
-    : null;
+class Room {
+  constructor(code, name, createdBy) {
+    this.code = code;
+    this.name = name || 'Game Room';
+    this.createdBy = createdBy; // userId
+    this.scheduledStart = null; // ISO string
+    this.scheduleTimer = null;
 
-  for (let i = 0; i < 4; i++) {
-    const sid = game.slots[i];
-    if (!sid) continue;
+    // Game state
+    this.players = {}; // socketId -> { slot, name, userId, avatar, stats }
+    this.slots = [null, null, null, null];
+    this.slotNames = ['', '', '', ''];
+    this.slotProfiles = [null, null, null, null];
+    this.slotDisconnected = [false, false, false, false];
+    this.slotReserved = [null, null, null, null];
+    this.adminSlot = -1;
+    this.phase = 'lobby'; // lobby | waiting | countdown | secret | clue | guess | roundOver | gameOver
+    this.scores = { team1: 0, team2: 0 };
+    this.secretWord = null;
+    this.clues = [];
+    this.roundStarter = 0;
+    this.turnWithinRound = 0;
+    this.timer = null;
+    this.timeLeft = 0;
+    this.countdownLeft = 0;
+    this.disconnectTimer = null;
+  }
 
-    const state = {
-      phase: game.phase,
-      scores: game.scores,
-      slots: game.slots.map((s, idx) => (s || game.slotDisconnected[idx]) ? { slot: idx, name: getSlotName(idx), connected: !!s && !game.slotDisconnected[idx], disconnected: game.slotDisconnected[idx] } : null),
-      slotNames: game.slotNames,
-      slotProfiles: game.slotProfiles,
-      adminSlot: game.adminSlot,
-      mySlot: i,
-      clues: game.clues,
-      timeLeft: game.timeLeft,
-      countdownLeft: game.countdownLeft,
-      secretWord: null,
-      currentTurn: config ? {
-        secretHolder: config.secretHolder,
-        clueGiver: config.clueGiver,
-        guesser: config.guesser,
-      } : null,
-      roundStarter: game.roundStarter,
+  getSlotName(slot) {
+    return this.slotNames[slot] || `Player ${slot + 1}`;
+  }
+
+  // Emit to all sockets in this room
+  emitToRoom(event, data) {
+    for (const sid of Object.keys(this.players)) {
+      io.to(sid).emit(event, data);
+    }
+  }
+
+  broadcastLobby() {
+    const lobbyState = {
+      code: this.code,
+      name: this.name,
+      createdBy: this.createdBy,
+      scheduledStart: this.scheduledStart,
+      phase: this.phase,
+      countdownLeft: this.countdownLeft,
+      slots: this.slots.map((s, idx) => {
+        if (!s && !this.slotDisconnected[idx] && !this.slotReserved[idx]) return null;
+        return { slot: idx, name: this.getSlotName(idx), connected: !!s && !this.slotDisconnected[idx], disconnected: this.slotDisconnected[idx] };
+      }),
+      slotNames: this.slotNames,
+      slotProfiles: this.slotProfiles,
+      adminSlot: this.adminSlot,
+    };
+    for (const [sid, player] of Object.entries(this.players)) {
+      io.to(sid).emit('roomState', { ...lobbyState, mySlot: player.slot });
+    }
+  }
+
+  broadcastGameState() {
+    const config = this.phase !== 'waiting' && this.phase !== 'lobby' && this.phase !== 'gameOver' && this.phase !== 'countdown'
+      ? getRoundConfig(this.roundStarter, this.turnWithinRound)
+      : null;
+
+    for (let i = 0; i < 4; i++) {
+      const sid = this.slots[i];
+      if (!sid) continue;
+
+      const state = {
+        roomCode: this.code,
+        roomName: this.name,
+        phase: this.phase,
+        scores: this.scores,
+        slots: this.slots.map((s, idx) => (s || this.slotDisconnected[idx]) ? { slot: idx, name: this.getSlotName(idx), connected: !!s && !this.slotDisconnected[idx], disconnected: this.slotDisconnected[idx] } : null),
+        slotNames: this.slotNames,
+        slotProfiles: this.slotProfiles,
+        adminSlot: this.adminSlot,
+        mySlot: i,
+        clues: this.clues,
+        timeLeft: this.timeLeft,
+        countdownLeft: this.countdownLeft,
+        secretWord: null,
+        currentTurn: config ? { secretHolder: config.secretHolder, clueGiver: config.clueGiver, guesser: config.guesser } : null,
+        roundStarter: this.roundStarter,
+      };
+
+      if (this.secretWord && config) {
+        if (i === config.secretHolder || i === config.receiver) {
+          state.secretWord = this.secretWord;
+        }
+      }
+
+      io.to(sid).emit('state', state);
+    }
+
+    // Spectators in this room
+    for (const [sid, player] of Object.entries(this.players)) {
+      if (player.slot === -1) {
+        io.to(sid).emit('state', {
+          roomCode: this.code,
+          roomName: this.name,
+          phase: this.phase,
+          scores: this.scores,
+          slots: this.slots.map((s, idx) => (s || this.slotDisconnected[idx]) ? { slot: idx, name: this.getSlotName(idx), connected: !!s && !this.slotDisconnected[idx], disconnected: this.slotDisconnected[idx] } : null),
+          slotNames: this.slotNames,
+          slotProfiles: this.slotProfiles,
+          adminSlot: this.adminSlot,
+          mySlot: -1,
+          clues: this.clues,
+          timeLeft: this.timeLeft,
+          countdownLeft: this.countdownLeft,
+          secretWord: null,
+          currentTurn: config ? { secretHolder: config.secretHolder, clueGiver: config.clueGiver, guesser: config.guesser } : null,
+          roundStarter: this.roundStarter,
+        });
+      }
+    }
+  }
+
+  clearTimer() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+  }
+
+  startGuessTimer() {
+    this.timeLeft = 30;
+    this.clearTimer();
+    this.timer = setInterval(() => {
+      this.timeLeft--;
+      if (this.timeLeft <= 0) {
+        this.clearTimer();
+        this.turnWithinRound++;
+        this.startClueTurn();
+      } else {
+        this.emitToRoom('tick', this.timeLeft);
+      }
+    }, 1000);
+  }
+
+  startClueTurn() {
+    this.clearTimer();
+    this.phase = 'clue';
+    this.broadcastGameState();
+    this.checkDisconnectedTurn();
+  }
+
+  startNewRound() {
+    this.secretWord = null;
+    this.clues = [];
+    this.turnWithinRound = 0;
+    this.phase = 'secret';
+    this.broadcastGameState();
+    this.checkDisconnectedTurn();
+  }
+
+  checkWin() {
+    const { team1, team2 } = this.scores;
+    const maxScore = Math.max(team1, team2);
+    const diff = Math.abs(team1 - team2);
+    if (maxScore >= 10 && diff >= 2) {
+      this.phase = 'gameOver';
+      this.clearTimer();
+
+      const winningTeam = team1 > team2 ? 'team1' : 'team2';
+      for (let i = 0; i < 4; i++) {
+        const sid = this.slots[i];
+        if (!sid) continue;
+        const p = this.players[sid];
+        if (!p || !p.userId) continue;
+        if (getTeam(i) === winningTeam) {
+          stmts.addGameWon.run(p.userId);
+        } else {
+          stmts.addGamePlayed.run(p.userId);
+        }
+        const fresh = stmts.getProfile.get(p.userId);
+        if (fresh) {
+          p.stats = { games_played: fresh.games_played, games_won: fresh.games_won };
+          if (this.slotProfiles[i]) this.slotProfiles[i].stats = p.stats;
+        }
+      }
+
+      stmts.updateRoomStatus.run('finished', this.code);
+      this.broadcastGameState();
+      return true;
+    }
+    return false;
+  }
+
+  checkDisconnectedTurn() {
+    if (this.disconnectTimer) { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
+    if (this.phase !== 'secret' && this.phase !== 'clue' && this.phase !== 'guess') return;
+
+    const config = getRoundConfig(this.roundStarter, this.turnWithinRound);
+    let activeSlot = -1;
+    if (this.phase === 'secret') activeSlot = config.secretHolder;
+    else if (this.phase === 'clue') activeSlot = config.clueGiver;
+    else if (this.phase === 'guess') activeSlot = config.guesser;
+
+    if (activeSlot >= 0 && this.slotDisconnected[activeSlot]) {
+      this.disconnectTimer = setTimeout(() => {
+        this.disconnectTimer = null;
+        if (!this.slotDisconnected[activeSlot]) return;
+        console.log(`[${this.code}] Auto-skipping turn for disconnected slot ${activeSlot}`);
+        if (this.phase === 'secret') {
+          this.secretWord = '???';
+          this.phase = 'clue';
+          this.broadcastGameState();
+        } else if (this.phase === 'clue') {
+          this.turnWithinRound++;
+          this.startClueTurn();
+        } else if (this.phase === 'guess') {
+          this.clearTimer();
+          this.turnWithinRound++;
+          this.startClueTurn();
+        }
+      }, 15000);
+    }
+  }
+
+  addPlayer(socketId, authUser) {
+    this.players[socketId] = {
+      slot: -1, name: '',
+      userId: authUser?.id || null,
+      avatar: authUser?.avatar || null,
+      stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : null
+    };
+  }
+
+  tryReconnect(socketId, authUser, reconnectToken) {
+    for (let i = 0; i < 4; i++) {
+      if (!this.slotDisconnected[i]) continue;
+      const res = this.slotReserved[i];
+      if (!res) continue;
+      if ((authUser && res.userId && authUser.id === res.userId) ||
+          (reconnectToken && res.reconnectToken && reconnectToken === res.reconnectToken)) {
+        this.slots[i] = socketId;
+        this.slotDisconnected[i] = false;
+        this.players[socketId] = {
+          slot: i, name: res.name,
+          userId: authUser?.id || res.userId || null,
+          avatar: authUser?.avatar || res.avatar || null,
+          stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : res.stats || null
+        };
+        if (authUser) {
+          this.slotProfiles[i] = { userId: authUser.id, avatar: authUser.avatar, stats: { games_played: authUser.games_played, games_won: authUser.games_won } };
+        }
+        console.log(`[${this.code}] Player reconnected to slot ${i}: ${res.name}`);
+        if (this.disconnectTimer) { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
+        this.checkDisconnectedTurn();
+        return { slot: i, name: res.name, reconnectToken: res.reconnectToken };
+      }
+    }
+    return null;
+  }
+
+  joinSlot(socketId, slot, name) {
+    if (slot < 0 || slot > 3) return null;
+    if (this.slots[slot] !== null) return null;
+    if (this.phase !== 'lobby' && this.phase !== 'waiting' && this.phase !== 'countdown') return null;
+
+    const player = this.players[socketId];
+    if (!player) return null;
+
+    // Remove from previous slot
+    if (player.slot >= 0) {
+      this.slots[player.slot] = null;
+      this.slotNames[player.slot] = '';
+      this.slotProfiles[player.slot] = null;
+      this.slotReserved[player.slot] = null;
+    }
+
+    const trimmedName = (name || '').trim().substring(0, 20) || `Player ${slot + 1}`;
+    this.slots[slot] = socketId;
+    this.slotNames[slot] = trimmedName;
+    this.slotDisconnected[slot] = false;
+    this.players[socketId] = { slot, name: trimmedName, userId: player.userId, avatar: player.avatar, stats: player.stats };
+    this.slotProfiles[slot] = player.userId ? { userId: player.userId, avatar: player.avatar, stats: player.stats } : null;
+
+    const rToken = player.userId ? null : Math.random().toString(36).substring(2) + Date.now().toString(36);
+    this.slotReserved[slot] = {
+      userId: player.userId, reconnectToken: rToken, name: trimmedName,
+      avatar: player.avatar, stats: player.stats, profile: this.slotProfiles[slot]
     };
 
-    // Only show secret word to secret holder and the receiver
-    if (game.secretWord && config) {
-      if (i === config.secretHolder || i === config.receiver) {
-        state.secretWord = game.secretWord;
-      }
-    }
+    if (this.adminSlot === -1) this.adminSlot = slot;
 
-    io.to(sid).emit('state', state);
+    return { slot, name: trimmedName, reconnectToken: rToken };
   }
 
-  // Also send to spectators (anyone not in a slot)
-  for (const [sid, player] of Object.entries(game.players)) {
-    if (player.slot === -1) {
-      io.to(sid).emit('state', {
-        phase: game.phase,
-        scores: game.scores,
-        slots: game.slots.map((s, idx) => (s || game.slotDisconnected[idx]) ? { slot: idx, name: getSlotName(idx), connected: !!s && !game.slotDisconnected[idx], disconnected: game.slotDisconnected[idx] } : null),
-        slotNames: game.slotNames,
-        slotProfiles: game.slotProfiles,
-        adminSlot: game.adminSlot,
-        mySlot: -1,
-        clues: game.clues,
-        timeLeft: game.timeLeft,
-        countdownLeft: game.countdownLeft,
-        secretWord: null,
-        currentTurn: config ? {
-          secretHolder: config.secretHolder,
-          clueGiver: config.clueGiver,
-          guesser: config.guesser,
-        } : null,
-        roundStarter: game.roundStarter,
-      });
+  // Admin can move a player to a different slot (team arrangement)
+  movePlayer(adminSocketId, fromSlot, toSlot) {
+    const admin = this.players[adminSocketId];
+    if (!admin || admin.slot !== this.adminSlot) return false;
+    if (this.phase !== 'lobby' && this.phase !== 'waiting') return false;
+    if (fromSlot < 0 || fromSlot > 3 || toSlot < 0 || toSlot > 3) return false;
+    if (this.slots[fromSlot] === null && !this.slotReserved[fromSlot]) return false;
+    if (this.slots[toSlot] !== null) return false; // target must be empty
+
+    // Swap all data
+    const sid = this.slots[fromSlot];
+    this.slots[toSlot] = sid;
+    this.slots[fromSlot] = null;
+    this.slotNames[toSlot] = this.slotNames[fromSlot];
+    this.slotNames[fromSlot] = '';
+    this.slotProfiles[toSlot] = this.slotProfiles[fromSlot];
+    this.slotProfiles[fromSlot] = null;
+    this.slotDisconnected[toSlot] = this.slotDisconnected[fromSlot];
+    this.slotDisconnected[fromSlot] = false;
+    this.slotReserved[toSlot] = this.slotReserved[fromSlot];
+    this.slotReserved[fromSlot] = null;
+
+    if (sid && this.players[sid]) {
+      this.players[sid].slot = toSlot;
     }
+    if (fromSlot === this.adminSlot) this.adminSlot = toSlot;
+
+    return true;
   }
-}
 
-function clearTimer() {
-  if (game.timer) {
-    clearInterval(game.timer);
-    game.timer = null;
+  startGame(socketId) {
+    const player = this.players[socketId];
+    if (!player || player.slot !== this.adminSlot) return false;
+    if (this.phase !== 'lobby' && this.phase !== 'waiting') return false;
+    if (!this.slots.every(s => s !== null)) return false;
+
+    this.clearTimer();
+    this.countdownLeft = 0;
+    this.roundStarter = 0;
+    this.scores = { team1: 0, team2: 0 };
+    stmts.updateRoomStatus.run('playing', this.code);
+    this.startNewRound();
+    return true;
   }
-}
 
-function startGuessTimer() {
-  game.timeLeft = 30;
-  clearTimer();
-  game.timer = setInterval(() => {
-    game.timeLeft--;
-    if (game.timeLeft <= 0) {
-      clearTimer();
-      // Time's up, move to next turn
-      game.turnWithinRound++;
-      startClueTurn();
-    } else {
-      // Lightweight tick - don't re-render entire UI
-      io.emit('tick', game.timeLeft);
-    }
-  }, 1000);
-}
+  startCountdown(socketId, seconds) {
+    const player = this.players[socketId];
+    if (!player || player.slot !== this.adminSlot) return false;
+    if (this.phase !== 'lobby' && this.phase !== 'waiting') return false;
 
-function startClueTurn() {
-  clearTimer();
-  const config = getRoundConfig(game.roundStarter, game.turnWithinRound);
-  game.phase = 'clue';
-  broadcastState();
-  checkDisconnectedTurn();
-}
+    const secs = Math.max(5, Math.min(300, parseInt(seconds) || 30));
+    this.phase = 'countdown';
+    this.countdownLeft = secs;
+    this.clearTimer();
+    this.broadcastLobby();
 
-function startNewRound() {
-  game.secretWord = null;
-  game.clues = [];
-  game.turnWithinRound = 0;
-  game.phase = 'secret';
-  broadcastState();
-  checkDisconnectedTurn();
-}
-
-function checkWin() {
-  const { team1, team2 } = game.scores;
-  const maxScore = Math.max(team1, team2);
-  const diff = Math.abs(team1 - team2);
-  if (maxScore >= 10 && diff >= 2) {
-    game.phase = 'gameOver';
-    clearTimer();
-
-    // Track stats for logged-in players
-    const winningTeam = team1 > team2 ? 'team1' : 'team2';
-    for (let i = 0; i < 4; i++) {
-      const sid = game.slots[i];
-      if (!sid) continue;
-      const p = game.players[sid];
-      if (!p || !p.userId) continue;
-      const playerTeam = getTeam(i);
-      if (playerTeam === winningTeam) {
-        stmts.addGameWon.run(p.userId);
+    this.timer = setInterval(() => {
+      this.countdownLeft--;
+      if (this.countdownLeft <= 0) {
+        this.clearTimer();
+        if (this.slots.every(s => s !== null)) {
+          this.countdownLeft = 0;
+          this.roundStarter = 0;
+          this.scores = { team1: 0, team2: 0 };
+          stmts.updateRoomStatus.run('playing', this.code);
+          this.startNewRound();
+        } else {
+          this.phase = 'lobby';
+          this.countdownLeft = 0;
+          this.broadcastLobby();
+        }
       } else {
-        stmts.addGamePlayed.run(p.userId);
+        this.emitToRoom('countdownTick', this.countdownLeft);
       }
-      // Refresh profile in slot
-      const fresh = stmts.getProfile.get(p.userId);
-      if (fresh) {
-        p.stats = { games_played: fresh.games_played, games_won: fresh.games_won };
-        if (game.slotProfiles[i]) {
-          game.slotProfiles[i].stats = p.stats;
+    }, 1000);
+    return true;
+  }
+
+  cancelCountdown(socketId) {
+    const player = this.players[socketId];
+    if (!player || player.slot !== this.adminSlot) return false;
+    if (this.phase !== 'countdown') return false;
+    this.clearTimer();
+    this.phase = 'lobby';
+    this.countdownLeft = 0;
+    this.broadcastLobby();
+    return true;
+  }
+
+  submitSecret(socketId, word) {
+    if (this.phase !== 'secret') return;
+    const player = this.players[socketId];
+    if (!player || player.slot === -1) return;
+    const config = getRoundConfig(this.roundStarter, this.turnWithinRound);
+    if (player.slot !== config.secretHolder) return;
+    const trimmed = (word || '').trim();
+    if (!trimmed) return;
+    this.secretWord = trimmed;
+    this.phase = 'clue';
+    this.broadcastGameState();
+  }
+
+  submitClue(socketId, word) {
+    if (this.phase !== 'clue') return;
+    const player = this.players[socketId];
+    if (!player || player.slot === -1) return;
+    const config = getRoundConfig(this.roundStarter, this.turnWithinRound);
+    if (player.slot !== config.clueGiver) return;
+    const trimmed = (word || '').trim();
+    if (!trimmed) return;
+    const oneWord = trimmed.split(/\s+/)[0];
+    this.clues.push({ from: player.slot, word: oneWord });
+    this.phase = 'guess';
+    this.startGuessTimer();
+    this.broadcastGameState();
+    this.checkDisconnectedTurn();
+  }
+
+  submitGuess(socketId, word) {
+    if (this.phase !== 'guess') return;
+    const player = this.players[socketId];
+    if (!player || player.slot === -1) return;
+    const config = getRoundConfig(this.roundStarter, this.turnWithinRound);
+    if (player.slot !== config.guesser) return;
+    const trimmed = (word || '').trim();
+    if (!trimmed) return;
+    const oneWord = trimmed.split(/\s+/)[0];
+
+    if (oneWord.toLowerCase() === this.secretWord.toLowerCase()) {
+      this.clearTimer();
+      const team = getTeam(player.slot);
+      this.scores[team]++;
+      if (this.checkWin()) return;
+      this.roundStarter = (this.roundStarter + 1) % 4;
+      this.phase = 'roundOver';
+      this.broadcastGameState();
+      setTimeout(() => {
+        if (this.phase === 'roundOver') this.startNewRound();
+      }, 3000);
+    } else {
+      this.clearTimer();
+      this.clues.push({ from: player.slot, word: oneWord, isGuess: true, wrong: true });
+      this.turnWithinRound++;
+      this.startClueTurn();
+    }
+  }
+
+  resetGame(socketId) {
+    this.clearTimer();
+    if (this.disconnectTimer) { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
+    const oldSlots = [...this.slots];
+    const oldNames = [...this.slotNames];
+    const oldProfiles = [...this.slotProfiles];
+    const oldReserved = [...this.slotReserved];
+    const oldPlayers = { ...this.players };
+    const oldAdmin = this.adminSlot;
+
+    // Reset game fields
+    this.scores = { team1: 0, team2: 0 };
+    this.secretWord = null;
+    this.clues = [];
+    this.roundStarter = 0;
+    this.turnWithinRound = 0;
+    this.timeLeft = 0;
+    this.countdownLeft = 0;
+    this.phase = 'lobby';
+    this.slotDisconnected = [false, false, false, false];
+
+    // Re-assign connected players
+    this.slots = [null, null, null, null];
+    this.slotNames = ['', '', '', ''];
+    this.slotProfiles = [null, null, null, null];
+    this.slotReserved = [null, null, null, null];
+
+    for (let i = 0; i < 4; i++) {
+      if (oldSlots[i] && io.sockets.sockets.get(oldSlots[i])) {
+        this.slots[i] = oldSlots[i];
+        this.slotNames[i] = oldNames[i];
+        this.slotProfiles[i] = oldProfiles[i];
+        this.slotReserved[i] = oldReserved[i];
+        const op = oldPlayers[oldSlots[i]];
+        this.players[oldSlots[i]] = { slot: i, name: oldNames[i], userId: op?.userId || null, avatar: op?.avatar || null, stats: op?.stats || null };
+      }
+    }
+
+    this.adminSlot = (oldAdmin >= 0 && this.slots[oldAdmin]) ? oldAdmin : -1;
+    if (this.adminSlot === -1) {
+      for (let i = 0; i < 4; i++) {
+        if (this.slots[i] !== null) { this.adminSlot = i; break; }
+      }
+    }
+    stmts.updateRoomStatus.run('lobby', this.code);
+    this.broadcastLobby();
+    this.emitToRoom('gameReset');
+  }
+
+  handleDisconnect(socketId) {
+    const player = this.players[socketId];
+    if (!player) return;
+
+    if (player.slot >= 0) {
+      const slot = player.slot;
+      const wasAdmin = slot === this.adminSlot;
+      const isGameActive = this.phase === 'secret' || this.phase === 'clue' || this.phase === 'guess' || this.phase === 'roundOver';
+
+      if (isGameActive) {
+        this.slots[slot] = null;
+        this.slotDisconnected[slot] = true;
+        console.log(`[${this.code}] Slot ${slot} (${player.name}) disconnected - reserved`);
+
+        if (wasAdmin) {
+          this.adminSlot = -1;
+          for (let i = 0; i < 4; i++) {
+            if (this.slots[i] !== null && !this.slotDisconnected[i]) { this.adminSlot = i; break; }
+          }
+        }
+
+        const anyConnected = Object.keys(this.players).filter(s => s !== socketId).length > 0;
+        if (!anyConnected) {
+          this.clearTimer();
+          if (this.disconnectTimer) { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
+          // Keep room alive for reconnect but pause
+        } else {
+          this.checkDisconnectedTurn();
+        }
+      } else {
+        this.slots[slot] = null;
+        this.slotNames[slot] = '';
+        this.slotProfiles[slot] = null;
+        this.slotDisconnected[slot] = false;
+        this.slotReserved[slot] = null;
+        if (this.phase === 'countdown') {
+          this.clearTimer();
+          this.phase = 'lobby';
+          this.countdownLeft = 0;
+        }
+        if (wasAdmin) {
+          this.adminSlot = -1;
+          for (let i = 0; i < 4; i++) {
+            if (this.slots[i] !== null) { this.adminSlot = i; break; }
+          }
         }
       }
     }
 
-    broadcastState();
-    return true;
+    delete this.players[socketId];
+
+    // Broadcast appropriate state
+    if (this.phase === 'lobby' || this.phase === 'waiting') {
+      this.broadcastLobby();
+    } else {
+      this.broadcastGameState();
+    }
+
+    // Clean up empty rooms after a delay
+    if (Object.keys(this.players).length === 0) {
+      setTimeout(() => {
+        if (Object.keys(this.players).length === 0) {
+          console.log(`[${this.code}] Room empty, cleaning up`);
+          this.clearTimer();
+          if (this.disconnectTimer) clearTimeout(this.disconnectTimer);
+          if (this.scheduleTimer) clearTimeout(this.scheduleTimer);
+          rooms.delete(this.code);
+        }
+      }, 300000); // 5 minutes
+    }
   }
-  return false;
 }
 
-// Resolve user profile from socket auth token
+// ─── Resolve user from socket ──────────────────────────
 function resolveUser(socket) {
   const token = socket.handshake.auth?.token;
   if (!token) return null;
@@ -224,369 +613,207 @@ function resolveUser(socket) {
   return stmts.getProfile.get(decoded.userId) || null;
 }
 
-// Auto-skip turn if active player is disconnected
-function checkDisconnectedTurn() {
-  if (game.disconnectTimer) { clearTimeout(game.disconnectTimer); game.disconnectTimer = null; }
-  if (game.phase !== 'secret' && game.phase !== 'clue' && game.phase !== 'guess') return;
+// Track which room each socket is in
+const socketRooms = new Map(); // socketId -> roomCode
 
-  const config = getRoundConfig(game.roundStarter, game.turnWithinRound);
-  let activeSlot = -1;
-  if (game.phase === 'secret') activeSlot = config.secretHolder;
-  else if (game.phase === 'clue') activeSlot = config.clueGiver;
-  else if (game.phase === 'guess') activeSlot = config.guesser;
-
-  if (activeSlot >= 0 && game.slotDisconnected[activeSlot]) {
-    // Give them 15 seconds to reconnect, then auto-skip
-    game.disconnectTimer = setTimeout(() => {
-      game.disconnectTimer = null;
-      if (!game.slotDisconnected[activeSlot]) return; // they reconnected
-      console.log(`Auto-skipping turn for disconnected slot ${activeSlot}`);
-      if (game.phase === 'secret') {
-        // Can't skip secret - set a placeholder and move on
-        game.secretWord = '???';
-        game.phase = 'clue';
-        broadcastState();
-      } else if (game.phase === 'clue') {
-        // Skip to next turn
-        game.turnWithinRound++;
-        startClueTurn();
-      } else if (game.phase === 'guess') {
-        clearTimer();
-        game.turnWithinRound++;
-        startClueTurn();
-      }
-    }, 15000);
-  }
-}
-
+// ─── Socket connection ─────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`Connected: ${socket.id}`);
-
   const authUser = resolveUser(socket);
-  const reconnectToken = socket.handshake.auth?.reconnectToken || null;
 
-  // Check if this player can reconnect to a reserved slot
-  let reconnectedSlot = -1;
-  for (let i = 0; i < 4; i++) {
-    if (!game.slotDisconnected[i]) continue;
-    const res = game.slotReserved[i];
-    if (!res) continue;
-    // Match by userId (logged in) or reconnectToken (guest)
-    if ((authUser && res.userId && authUser.id === res.userId) ||
-        (reconnectToken && res.reconnectToken && reconnectToken === res.reconnectToken)) {
-      // Reconnect!
-      reconnectedSlot = i;
-      game.slots[i] = socket.id;
-      game.slotDisconnected[i] = false;
-      game.players[socket.id] = {
-        slot: i, name: res.name,
-        userId: authUser?.id || res.userId || null,
-        avatar: authUser?.avatar || res.avatar || null,
-        stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : res.stats || null
+  // Create a new room
+  socket.on('createRoom', ({ name, scheduledStart } = {}) => {
+    if (!authUser) { socket.emit('error', { message: 'Login required to create a room' }); return; }
+
+    const code = generateCode();
+    const roomName = (name || '').trim().substring(0, 40) || 'Game Room';
+    const room = new Room(code, roomName, authUser.id);
+
+    if (scheduledStart) {
+      room.scheduledStart = scheduledStart;
+    }
+
+    // Persist to DB
+    try {
+      stmts.createRoom.run(code, roomName, authUser.id, scheduledStart || null);
+    } catch (e) {
+      console.error('Failed to create room in DB:', e);
+    }
+
+    rooms.set(code, room);
+    console.log(`[${code}] Room created by ${authUser.username}`);
+    socket.emit('roomCreated', { code, name: roomName });
+  });
+
+  // List rooms created by the current user
+  socket.on('listMyRooms', () => {
+    if (!authUser) { socket.emit('myRooms', []); return; }
+    const dbRooms = stmts.getRoomsByUser.all(authUser.id);
+    const result = dbRooms.map(r => {
+      const live = rooms.get(r.code);
+      return {
+        code: r.code,
+        name: r.name,
+        status: live ? live.phase : r.status,
+        scheduledStart: r.scheduled_start,
+        playerCount: live ? Object.keys(live.players).length : 0,
+        createdAt: r.created_at,
       };
-      if (authUser) {
-        game.slotProfiles[i] = { userId: authUser.id, avatar: authUser.avatar, stats: { games_played: authUser.games_played, games_won: authUser.games_won } };
+    });
+    socket.emit('myRooms', result);
+  });
+
+  // Join a room
+  socket.on('joinRoom', ({ code, reconnectToken: rToken } = {}) => {
+    if (!code) return;
+    const roomCode = code.toUpperCase().trim();
+    const room = rooms.get(roomCode);
+
+    if (!room) {
+      // Check DB for persisted room
+      const dbRoom = stmts.findRoomByCode.get(roomCode);
+      if (!dbRoom || dbRoom.status === 'finished') {
+        socket.emit('error', { message: 'Room not found' });
+        return;
       }
-      console.log(`Player reconnected to slot ${i}: ${res.name}`);
-      socket.emit('assigned', { slot: i, name: res.name, reconnectToken: res.reconnectToken });
-      // Cancel disconnect timer if it was for this slot
-      if (game.disconnectTimer) { clearTimeout(game.disconnectTimer); game.disconnectTimer = null; }
-      broadcastState();
-      // Re-check if the active turn needs attention
-      checkDisconnectedTurn();
-      break;
-    }
-  }
-
-  if (reconnectedSlot === -1) {
-    game.players[socket.id] = { slot: -1, name: '', userId: authUser?.id || null, avatar: authUser?.avatar || null, stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : null };
-    socket.emit('assigned', { slot: -1, name: 'Spectator' });
-    broadcastState();
-  }
-
-  // Player picks a slot and sets their name
-  socket.on('joinSlot', ({ slot, name }) => {
-    if (slot < 0 || slot > 3) return;
-    if (game.slots[slot] !== null) return; // already taken
-    if (game.phase !== 'waiting' && game.phase !== 'countdown') return;
-
-    // Remove from previous slot if any
-    const player = game.players[socket.id];
-    if (player && player.slot >= 0) {
-      game.slots[player.slot] = null;
-      game.slotNames[player.slot] = '';
+      // Re-create room from DB
+      const newRoom = new Room(roomCode, dbRoom.name, dbRoom.created_by);
+      newRoom.scheduledStart = dbRoom.scheduled_start;
+      rooms.set(roomCode, newRoom);
+      joinExistingRoom(socket, newRoom, authUser, rToken);
+      return;
     }
 
-    const trimmedName = (name || '').trim().substring(0, 20) || `Player ${slot + 1}`;
-    game.slots[slot] = socket.id;
-    game.slotNames[slot] = trimmedName;
-    game.slotDisconnected[slot] = false;
-    const playerData = game.players[socket.id];
-    game.players[socket.id] = { slot, name: trimmedName, userId: playerData?.userId || null, avatar: playerData?.avatar || null, stats: playerData?.stats || null };
-    game.slotProfiles[slot] = playerData?.userId ? { userId: playerData.userId, avatar: playerData.avatar, stats: playerData.stats } : null;
-
-    // Generate reconnect token for guests
-    const rToken = playerData?.userId ? null : Math.random().toString(36).substring(2) + Date.now().toString(36);
-    game.slotReserved[slot] = {
-      userId: playerData?.userId || null,
-      reconnectToken: rToken,
-      name: trimmedName,
-      avatar: playerData?.avatar || null,
-      stats: playerData?.stats || null,
-      profile: game.slotProfiles[slot]
-    };
-
-    // First player to join becomes admin
-    if (game.adminSlot === -1) {
-      game.adminSlot = slot;
-    }
-
-    socket.emit('assigned', { slot, name: trimmedName, reconnectToken: rToken });
-    broadcastState();
+    joinExistingRoom(socket, room, authUser, rToken);
   });
 
-  // Admin starts game immediately
-  socket.on('startGame', () => {
-    if (game.phase !== 'waiting') return;
-    const player = game.players[socket.id];
-    if (!player || player.slot !== game.adminSlot) return;
-    // Need at least 4 players
-    if (!game.slots.every(s => s !== null)) return;
+  function joinExistingRoom(sock, room, user, rToken) {
+    // Leave current room if any
+    const prevCode = socketRooms.get(sock.id);
+    if (prevCode && prevCode !== room.code) {
+      const prevRoom = rooms.get(prevCode);
+      if (prevRoom) prevRoom.handleDisconnect(sock.id);
+    }
 
-    clearTimer();
-    game.countdownLeft = 0;
-    game.roundStarter = 0;
-    startNewRound();
-  });
+    socketRooms.set(sock.id, room.code);
 
-  // Admin sets a countdown timer before game starts
-  socket.on('startCountdown', (seconds) => {
-    if (game.phase !== 'waiting') return;
-    const player = game.players[socket.id];
-    if (!player || player.slot !== game.adminSlot) return;
-
-    const secs = Math.max(5, Math.min(300, parseInt(seconds) || 30));
-    game.phase = 'countdown';
-    game.countdownLeft = secs;
-    clearTimer();
-    broadcastState();
-
-    game.timer = setInterval(() => {
-      game.countdownLeft--;
-      if (game.countdownLeft <= 0) {
-        clearTimer();
-        // Start game if 4 players, otherwise back to waiting
-        if (game.slots.every(s => s !== null)) {
-          game.countdownLeft = 0;
-          game.roundStarter = 0;
-          startNewRound();
-        } else {
-          game.phase = 'waiting';
-          game.countdownLeft = 0;
-          broadcastState();
-        }
+    // Try reconnect
+    const reconnectResult = room.tryReconnect(sock.id, user, rToken);
+    if (reconnectResult) {
+      sock.emit('joinedRoom', { code: room.code, roomName: room.name, ...reconnectResult });
+      if (room.phase === 'lobby' || room.phase === 'waiting') {
+        room.broadcastLobby();
       } else {
-        io.emit('countdownTick', game.countdownLeft);
+        room.broadcastGameState();
       }
-    }, 1000);
+      return;
+    }
+
+    // Normal join
+    room.addPlayer(sock.id, user);
+    sock.emit('joinedRoom', { code: room.code, roomName: room.name, slot: -1, name: 'Spectator' });
+    room.broadcastLobby();
+  }
+
+  // Leave a room (back to home)
+  socket.on('leaveRoom', () => {
+    const code = socketRooms.get(socket.id);
+    if (!code) return;
+    const room = rooms.get(code);
+    if (room) room.handleDisconnect(socket.id);
+    socketRooms.delete(socket.id);
+    socket.emit('leftRoom');
   });
 
-  // Admin cancels countdown
+  // Room-scoped events
+  socket.on('joinSlot', ({ slot, name }) => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (!room) return;
+    const result = room.joinSlot(socket.id, slot, name);
+    if (result) {
+      socket.emit('assigned', { ...result, roomCode: room.code });
+      room.broadcastLobby();
+    }
+  });
+
+  socket.on('movePlayer', ({ fromSlot, toSlot }) => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (!room) return;
+    if (room.movePlayer(socket.id, fromSlot, toSlot)) {
+      // Notify moved player of their new slot
+      const movedSid = room.slots[toSlot];
+      if (movedSid) {
+        io.to(movedSid).emit('assigned', { slot: toSlot, name: room.slotNames[toSlot], roomCode: room.code });
+      }
+      room.broadcastLobby();
+    }
+  });
+
+  socket.on('setSchedule', ({ scheduledStart }) => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (!room || !authUser || room.createdBy !== authUser.id) return;
+    room.scheduledStart = scheduledStart || null;
+    try { stmts.updateRoomSchedule.run(scheduledStart || null, room.code); } catch (e) {}
+
+    // Set up auto-start timer if scheduled in the future
+    if (room.scheduleTimer) { clearTimeout(room.scheduleTimer); room.scheduleTimer = null; }
+    if (scheduledStart) {
+      const ms = new Date(scheduledStart).getTime() - Date.now();
+      if (ms > 0 && ms < 86400000) { // max 24h ahead
+        room.scheduleTimer = setTimeout(() => {
+          room.scheduleTimer = null;
+          if (room.phase === 'lobby' && room.slots.every(s => s !== null)) {
+            room.startGame(room.slots[room.adminSlot]);
+          }
+        }, ms);
+      }
+    }
+    room.broadcastLobby();
+  });
+
+  socket.on('startGame', () => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (room) room.startGame(socket.id);
+  });
+
+  socket.on('startCountdown', (seconds) => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (room) room.startCountdown(socket.id, seconds);
+  });
+
   socket.on('cancelCountdown', () => {
-    if (game.phase !== 'countdown') return;
-    const player = game.players[socket.id];
-    if (!player || player.slot !== game.adminSlot) return;
-
-    clearTimer();
-    game.phase = 'waiting';
-    game.countdownLeft = 0;
-    broadcastState();
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (room) room.cancelCountdown(socket.id);
   });
 
-  // Secret word submission (from secret holder)
   socket.on('submitSecret', (word) => {
-    if (game.phase !== 'secret') return;
-    const player = game.players[socket.id];
-    if (!player || player.slot === -1) return;
-
-    const config = getRoundConfig(game.roundStarter, game.turnWithinRound);
-    if (player.slot !== config.secretHolder) return;
-
-    const trimmed = (word || '').trim();
-    if (!trimmed) return;
-
-    game.secretWord = trimmed;
-    game.phase = 'clue';
-    broadcastState();
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (room) room.submitSecret(socket.id, word);
   });
 
-  // Clue submission (from clue giver)
   socket.on('submitClue', (word) => {
-    if (game.phase !== 'clue') return;
-    const player = game.players[socket.id];
-    if (!player || player.slot === -1) return;
-
-    const config = getRoundConfig(game.roundStarter, game.turnWithinRound);
-    if (player.slot !== config.clueGiver) return;
-
-    const trimmed = (word || '').trim();
-    if (!trimmed) return;
-
-    // Only one word allowed
-    const oneWord = trimmed.split(/\s+/)[0];
-    game.clues.push({ from: player.slot, word: oneWord });
-    game.phase = 'guess';
-    startGuessTimer();
-    broadcastState();
-    checkDisconnectedTurn();
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (room) room.submitClue(socket.id, word);
   });
 
-  // Guess submission (from guesser)
   socket.on('submitGuess', (word) => {
-    if (game.phase !== 'guess') return;
-    const player = game.players[socket.id];
-    if (!player || player.slot === -1) return;
-
-    const config = getRoundConfig(game.roundStarter, game.turnWithinRound);
-    if (player.slot !== config.guesser) return;
-
-    const trimmed = (word || '').trim();
-    if (!trimmed) return;
-
-    const oneWord = trimmed.split(/\s+/)[0];
-
-    if (oneWord.toLowerCase() === game.secretWord.toLowerCase()) {
-      // Correct guess!
-      clearTimer();
-      const team = getTeam(player.slot);
-      game.scores[team]++;
-
-      if (checkWin()) return;
-
-      // Switch round starter (cycle through all 4)
-      game.roundStarter = (game.roundStarter + 1) % 4;
-
-      // Brief pause then new round
-      game.phase = 'roundOver';
-      broadcastState();
-
-      setTimeout(() => {
-        if (game.phase === 'roundOver') {
-          startNewRound();
-        }
-      }, 3000);
-    } else {
-      // Wrong guess - one guess only, move to next turn
-      clearTimer();
-      game.clues.push({ from: player.slot, word: oneWord, isGuess: true, wrong: true });
-      game.turnWithinRound++;
-      startClueTurn();
-    }
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (room) room.submitGuess(socket.id, word);
   });
 
-  // Reset game
   socket.on('resetGame', () => {
-    clearTimer();
-    if (game.disconnectTimer) { clearTimeout(game.disconnectTimer); game.disconnectTimer = null; }
-    const oldSlots = [...game.slots];
-    const oldNames = [...game.slotNames];
-    const oldProfiles = [...game.slotProfiles];
-    const oldReserved = [...game.slotReserved];
-    const oldPlayers = { ...game.players };
-    const oldAdmin = game.adminSlot;
-    game = createFreshGame();
-    // Re-assign connected players (drop disconnected slots on reset)
-    for (let i = 0; i < 4; i++) {
-      if (oldSlots[i] && io.sockets.sockets.get(oldSlots[i])) {
-        game.slots[i] = oldSlots[i];
-        game.slotNames[i] = oldNames[i];
-        game.slotProfiles[i] = oldProfiles[i];
-        game.slotReserved[i] = oldReserved[i];
-        const op = oldPlayers[oldSlots[i]];
-        game.players[oldSlots[i]] = { slot: i, name: oldNames[i], userId: op?.userId || null, avatar: op?.avatar || null, stats: op?.stats || null };
-      }
-    }
-    // Preserve admin
-    game.adminSlot = (oldAdmin >= 0 && game.slots[oldAdmin]) ? oldAdmin : -1;
-    if (game.adminSlot === -1) {
-      for (let i = 0; i < 4; i++) {
-        if (game.slots[i] !== null) { game.adminSlot = i; break; }
-      }
-    }
-    broadcastState();
-    io.emit('gameReset');
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (room) room.resetGame(socket.id);
   });
 
   socket.on('disconnect', () => {
     console.log(`Disconnected: ${socket.id}`);
-    const player = game.players[socket.id];
-    if (player && player.slot >= 0) {
-      const slot = player.slot;
-      const wasAdmin = slot === game.adminSlot;
-      const isGameActive = game.phase !== 'waiting' && game.phase !== 'gameOver' && game.phase !== 'countdown';
-
-      if (isGameActive) {
-        // Keep slot reserved, mark as disconnected - game continues
-        game.slots[slot] = null;
-        game.slotDisconnected[slot] = true;
-        // slotNames, slotProfiles, slotReserved stay intact
-        console.log(`Slot ${slot} (${player.name}) disconnected - slot reserved for reconnect`);
-
-        // Transfer admin to next connected player
-        if (wasAdmin) {
-          game.adminSlot = -1;
-          for (let i = 0; i < 4; i++) {
-            if (game.slots[i] !== null && !game.slotDisconnected[i]) {
-              game.adminSlot = i;
-              break;
-            }
-          }
-        }
-
-        // Check if ALL players are disconnected
-        const anyConnected = game.slots.some(s => s !== null);
-        if (!anyConnected) {
-          // Everyone left - reset to waiting
-          clearTimer();
-          if (game.disconnectTimer) { clearTimeout(game.disconnectTimer); game.disconnectTimer = null; }
-          game.phase = 'waiting';
-          game.countdownLeft = 0;
-          for (let i = 0; i < 4; i++) {
-            game.slotDisconnected[i] = false;
-            game.slotReserved[i] = null;
-            game.slotNames[i] = '';
-            game.slotProfiles[i] = null;
-          }
-        } else {
-          // Check if we need to auto-skip the disconnected player's turn
-          checkDisconnectedTurn();
-        }
-      } else {
-        // In waiting/countdown/gameOver - fully release the slot
-        game.slots[slot] = null;
-        game.slotNames[slot] = '';
-        game.slotProfiles[slot] = null;
-        game.slotDisconnected[slot] = false;
-        game.slotReserved[slot] = null;
-        if (game.phase === 'countdown') {
-          clearTimer();
-          game.phase = 'waiting';
-          game.countdownLeft = 0;
-        }
-        // Transfer admin
-        if (wasAdmin) {
-          game.adminSlot = -1;
-          for (let i = 0; i < 4; i++) {
-            if (game.slots[i] !== null) {
-              game.adminSlot = i;
-              break;
-            }
-          }
-        }
-      }
+    const code = socketRooms.get(socket.id);
+    if (code) {
+      const room = rooms.get(code);
+      if (room) room.handleDisconnect(socket.id);
     }
-    delete game.players[socket.id];
-    broadcastState();
+    socketRooms.delete(socket.id);
   });
 });
 

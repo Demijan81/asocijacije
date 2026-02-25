@@ -1007,6 +1007,224 @@
       color: #f87171;
       margin-top: 2px;
     }
+
+    /* Home screen */
+    .home-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .home-screen h1 {
+      font-size: 2.5rem;
+      background: linear-gradient(135deg, #60a5fa, #fbbf24);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+
+    .home-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .home-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .home-card h3 {
+      font-size: 1rem;
+      color: #e2e8f0;
+      margin-bottom: 10px;
+    }
+
+    .home-card .input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .home-card input {
+      flex: 1;
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #e2e8f0;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    .home-card input:focus { border-color: #60a5fa; }
+
+    .home-card .btn {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+
+    .home-card .btn:hover { background: #2563eb; }
+    .home-card .btn.green { background: #22c55e; }
+    .home-card .btn.green:hover { background: #16a34a; }
+
+    /* My rooms list */
+    .my-rooms { margin-top: 4px; }
+
+    .room-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #0f172a;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .room-item:hover { background: #1e293b; border: 1px solid #3b82f6; margin: -1px -1px 5px -1px; }
+
+    .room-item .room-name {
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .room-item .room-code {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-left: 8px;
+    }
+
+    .room-item .room-meta {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    .room-status {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+
+    .room-status.lobby { background: #1e3a5f; color: #60a5fa; }
+    .room-status.playing { background: #166534; color: #4ade80; }
+    .room-status.finished { background: #3b1c1c; color: #f87171; }
+
+    /* Room lobby (replaces waiting screen) */
+    .invite-section {
+      background: #0f172a;
+      border: 1px dashed #334155;
+      border-radius: 10px;
+      padding: 12px 16px;
+      text-align: center;
+      margin-top: 12px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .invite-section .invite-label {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    .invite-link {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #60a5fa;
+      word-break: break-all;
+      cursor: pointer;
+    }
+
+    .invite-link:hover { text-decoration: underline; }
+
+    .invite-code {
+      font-family: monospace;
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: 4px;
+      color: #f59e0b;
+      margin: 4px 0;
+    }
+
+    .btn-back {
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 8px;
+    }
+
+    .btn-back:hover { color: #e2e8f0; border-color: #60a5fa; }
+
+    .schedule-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .schedule-row input[type="datetime-local"] {
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-radius: 10px;
+      padding: 8px 12px;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .schedule-row input:focus { border-color: #60a5fa; }
+
+    .move-arrows {
+      display: flex;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .move-btn {
+      background: #334155;
+      color: #94a3b8;
+      border: none;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .move-btn:hover { background: #475569; color: #e2e8f0; }
+
+    .no-rooms {
+      color: #475569;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 12px;
+    }
   </style>
 </head>
 <body>
@@ -1052,10 +1270,10 @@
   <script>
     // ─── Auth state ────────────────────────────────
     let authToken = localStorage.getItem('authToken') || null;
-    let userProfile = null; // { id, username, email, avatar, totp_enabled, games_played, games_won }
-    let authScreen = 'login'; // login | register | verify2fa
+    let userProfile = null;
+    let authScreen = 'login';
     let pending2faToken = null;
-    let setup2faData = null; // { secret, qrDataUrl }
+    let setup2faData = null;
 
     const AVATARS = [
       '😀','😎','🤓','🥳','😈','👻','🤖','👽',
@@ -1064,13 +1282,17 @@
       '🚀','🌈','🎸','🎭','🧙','🦸','🧛','🤠',
     ];
 
-    // ─── Socket setup (with auth) ──────────────────
+    // ─── App state ─────────────────────────────────
     let socket = null;
     let mySlot = -1;
     let myName = '';
     let currentState = null;
-    let lastRenderedPhase = null;
+    let currentRoomState = null;
+    let currentRoomCode = null;
+    let myRoomsList = [];
+    let screen = 'auth'; // auth | home | room | game
 
+    // ─── Socket setup ──────────────────────────────
     function connectSocket() {
       if (socket) socket.disconnect();
       const reconnectToken = sessionStorage.getItem('reconnectToken') || null;
@@ -1079,8 +1301,28 @@
       socket.on('assigned', (data) => {
         mySlot = data.slot;
         myName = data.name;
-        if (data.reconnectToken) {
-          sessionStorage.setItem('reconnectToken', data.reconnectToken);
+        if (data.reconnectToken) sessionStorage.setItem('reconnectToken', data.reconnectToken);
+      });
+
+      socket.on('roomCreated', (data) => {
+        currentRoomCode = data.code;
+        socket.emit('joinRoom', { code: data.code });
+      });
+
+      socket.on('joinedRoom', (data) => {
+        currentRoomCode = data.code;
+        mySlot = data.slot ?? -1;
+        myName = data.name || '';
+        if (data.reconnectToken) sessionStorage.setItem('reconnectToken', data.reconnectToken);
+        screen = 'room';
+      });
+
+      socket.on('roomState', (state) => {
+        currentRoomState = state;
+        mySlot = state.mySlot;
+        if (screen !== 'game') {
+          screen = 'room';
+          renderRoomLobby(state);
         }
       });
 
@@ -1088,23 +1330,18 @@
         const prevPhase = currentState?.phase;
         currentState = state;
         mySlot = state.mySlot;
+        screen = 'game';
 
-        // Skip full re-render if user is actively typing and phase hasn't changed
-        // This prevents mobile keyboard from being dismissed
         const activeEl = document.activeElement;
-        const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+        const isTyping = activeEl && activeEl.tagName === 'INPUT';
         const inputId = activeEl?.id;
         const isGameInput = inputId === 'secretInput' || inputId === 'clueInput' || inputId === 'guessInput';
         if (isTyping && isGameInput && prevPhase === state.phase) {
-          // Just update non-input parts (scores, timer, clues, player cards)
           updateScoreboard(state);
           updatePlayerCards(state);
-          lastRenderedPhase = state.phase;
           return;
         }
-
-        lastRenderedPhase = state.phase;
-        render(state);
+        renderGameView(state);
       });
 
       socket.on('tick', (timeLeft) => {
@@ -1124,7 +1361,26 @@
         }
       });
 
-      socket.on('gameReset', () => {});
+      socket.on('gameReset', () => { screen = 'room'; });
+
+      socket.on('leftRoom', () => {
+        currentRoomCode = null;
+        currentRoomState = null;
+        currentState = null;
+        mySlot = -1;
+        screen = 'home';
+        renderHome();
+      });
+
+      socket.on('myRooms', (list) => {
+        myRoomsList = list;
+        renderHome();
+      });
+
+      socket.on('error', (data) => {
+        const el = document.getElementById('homeError') || document.getElementById('authError');
+        if (el) el.innerHTML = `<p class="error-msg">${data.message}</p>`;
+      });
     }
 
     // ─── Auth API helpers ──────────────────────────
@@ -1144,11 +1400,15 @@
     }
 
     async function tryAutoLogin() {
+      // Check if URL has a room code
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlRoom = urlParams.get('room');
+
       if (!authToken) { renderAuth(); return; }
       const data = await apiGet('/me');
       if (data.profile) {
         userProfile = data.profile;
-        onLoggedIn();
+        onLoggedIn(urlRoom);
       } else {
         authToken = null;
         localStorage.removeItem('authToken');
@@ -1156,10 +1416,19 @@
       }
     }
 
-    function onLoggedIn() {
+    function onLoggedIn(autoJoinRoom) {
       myName = userProfile.username;
       updateProfileBar();
       connectSocket();
+      if (autoJoinRoom) {
+        setTimeout(() => socket.emit('joinRoom', { code: autoJoinRoom }), 300);
+      } else {
+        screen = 'home';
+        setTimeout(() => {
+          socket.emit('listMyRooms');
+          renderHome();
+        }, 200);
+      }
     }
 
     function enterAsGuest() {
@@ -1168,6 +1437,14 @@
       localStorage.removeItem('authToken');
       updateProfileBar();
       connectSocket();
+      screen = 'home';
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlRoom = urlParams.get('room');
+      if (urlRoom) {
+        setTimeout(() => socket.emit('joinRoom', { code: urlRoom }), 300);
+      } else {
+        setTimeout(() => renderHome(), 200);
+      }
     }
 
     function updateProfileBar() {
@@ -1194,8 +1471,9 @@
       }
     }
 
-    // ─── Auth screen rendering ─────────────────────
+    // ─── Auth screen ───────────────────────────────
     function renderAuth() {
+      screen = 'auth';
       const app = document.getElementById('app');
       if (authScreen === 'login') {
         app.innerHTML = `
@@ -1203,21 +1481,14 @@
             <h1>Asocijacije</h1>
             <div class="auth-box">
               <h2>Log In</h2>
-              <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="authEmail" placeholder="you@example.com">
-              </div>
-              <div class="form-group">
-                <label>Password</label>
-                <input type="password" id="authPassword" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()">
-              </div>
+              <div class="form-group"><label>Email</label><input type="email" id="authEmail" placeholder="you@example.com"></div>
+              <div class="form-group"><label>Password</label><input type="password" id="authPassword" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"></div>
               <button class="btn-primary" onclick="doLogin()">Log In</button>
               <button class="btn-secondary" onclick="authScreen='register';renderAuth()">Create Account</button>
               <div id="authError"></div>
             </div>
             <span class="guest-link" onclick="enterAsGuest()">Continue as guest</span>
-          </div>
-        `;
+          </div>`;
         document.getElementById('authEmail')?.focus();
       } else if (authScreen === 'register') {
         app.innerHTML = `
@@ -1225,25 +1496,15 @@
             <h1>Asocijacije</h1>
             <div class="auth-box">
               <h2>Create Account</h2>
-              <div class="form-group">
-                <label>Username</label>
-                <input type="text" id="regUsername" placeholder="Pick a username" maxlength="20">
-              </div>
-              <div class="form-group">
-                <label>Email</label>
-                <input type="email" id="regEmail" placeholder="you@example.com">
-              </div>
-              <div class="form-group">
-                <label>Password</label>
-                <input type="password" id="regPassword" placeholder="Min 6 characters" onkeydown="if(event.key==='Enter')doRegister()">
-              </div>
+              <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="Pick a username" maxlength="20"></div>
+              <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="you@example.com"></div>
+              <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Min 6 characters" onkeydown="if(event.key==='Enter')doRegister()"></div>
               <button class="btn-primary" onclick="doRegister()">Sign Up</button>
               <button class="btn-secondary" onclick="authScreen='login';renderAuth()">Back to Login</button>
               <div id="authError"></div>
             </div>
             <span class="guest-link" onclick="enterAsGuest()">Continue as guest</span>
-          </div>
-        `;
+          </div>`;
         document.getElementById('regUsername')?.focus();
       } else if (authScreen === 'verify2fa') {
         app.innerHTML = `
@@ -1252,16 +1513,12 @@
             <div class="auth-box">
               <h2>Two-Factor Authentication</h2>
               <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:12px;">Enter the 6-digit code from your authenticator app.</p>
-              <div class="form-group">
-                <label>2FA Code</label>
-                <input type="text" id="tfaCode" placeholder="000000" maxlength="6" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')doVerify2fa()">
-              </div>
+              <div class="form-group"><label>2FA Code</label><input type="text" id="tfaCode" placeholder="000000" maxlength="6" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')doVerify2fa()"></div>
               <button class="btn-primary" onclick="doVerify2fa()">Verify</button>
               <button class="btn-secondary" onclick="authScreen='login';pending2faToken=null;renderAuth()">Back</button>
               <div id="authError"></div>
             </div>
-          </div>
-        `;
+          </div>`;
         document.getElementById('tfaCode')?.focus();
       }
     }
@@ -1272,16 +1529,8 @@
       if (!email || !password) return showAuthError('Fill in all fields');
       const data = await api('/login', { email, password });
       if (data.error) return showAuthError(data.error);
-      if (data.needs2fa) {
-        pending2faToken = data.partialToken;
-        authScreen = 'verify2fa';
-        renderAuth();
-        return;
-      }
-      authToken = data.token;
-      localStorage.setItem('authToken', authToken);
-      userProfile = data.profile;
-      onLoggedIn();
+      if (data.needs2fa) { pending2faToken = data.partialToken; authScreen = 'verify2fa'; renderAuth(); return; }
+      authToken = data.token; localStorage.setItem('authToken', authToken); userProfile = data.profile; onLoggedIn();
     }
 
     async function doRegister() {
@@ -1291,10 +1540,7 @@
       if (!username || !email || !password) return showAuthError('Fill in all fields');
       const data = await api('/register', { username, email, password });
       if (data.error) return showAuthError(data.error);
-      authToken = data.token;
-      localStorage.setItem('authToken', authToken);
-      userProfile = data.profile;
-      onLoggedIn();
+      authToken = data.token; localStorage.setItem('authToken', authToken); userProfile = data.profile; onLoggedIn();
     }
 
     async function doVerify2fa() {
@@ -1302,259 +1548,132 @@
       if (!code || code.length !== 6) return showAuthError('Enter 6-digit code');
       const data = await api('/verify-2fa', { partialToken: pending2faToken, code });
       if (data.error) return showAuthError(data.error);
-      authToken = data.token;
-      localStorage.setItem('authToken', authToken);
-      userProfile = data.profile;
-      pending2faToken = null;
-      onLoggedIn();
+      authToken = data.token; localStorage.setItem('authToken', authToken); userProfile = data.profile; pending2faToken = null; onLoggedIn();
     }
 
-    function showAuthError(msg) {
-      const el = document.getElementById('authError');
-      if (el) el.innerHTML = `<p class="error-msg">${msg}</p>`;
-    }
+    function showAuthError(msg) { const el = document.getElementById('authError'); if (el) el.innerHTML = `<p class="error-msg">${msg}</p>`; }
 
     async function doLogout() {
       await api('/logout');
-      authToken = null;
-      userProfile = null;
-      localStorage.removeItem('authToken');
+      authToken = null; userProfile = null; localStorage.removeItem('authToken');
       if (socket) socket.disconnect();
-      mySlot = -1;
-      currentState = null;
-      updateProfileBar();
-      toggleProfile();
-      authScreen = 'login';
-      renderAuth();
+      mySlot = -1; currentState = null; currentRoomCode = null; currentRoomState = null;
+      updateProfileBar(); toggleProfile(); authScreen = 'login'; renderAuth();
     }
 
     // ─── Profile modal ─────────────────────────────
-    function toggleProfile() {
-      const modal = document.getElementById('profileModal');
-      modal.classList.toggle('hidden');
-      if (!modal.classList.contains('hidden')) renderProfilePanel();
-    }
-
-    function toggleRules() {
-      document.getElementById('rulesModal').classList.toggle('hidden');
-    }
+    function toggleProfile() { const m = document.getElementById('profileModal'); m.classList.toggle('hidden'); if (!m.classList.contains('hidden')) renderProfilePanel(); }
+    function toggleRules() { document.getElementById('rulesModal').classList.toggle('hidden'); }
 
     function renderProfilePanel() {
       if (!userProfile) return;
       const p = userProfile;
       const wp = p.games_played ? Math.round(p.games_won / p.games_played * 100) : 0;
       const panel = document.getElementById('profilePanel');
-
       let twofaHTML = '';
       if (p.totp_enabled) {
-        twofaHTML = `
-          <div class="twofa-section">
-            <div class="twofa-status">
-              <span>Two-Factor Auth</span>
-              <span class="twofa-badge on">Enabled</span>
-            </div>
-            <div class="form-group">
-              <label>Enter 2FA code to disable</label>
-              <input type="text" id="disable2faCode" placeholder="000000" maxlength="6">
-            </div>
-            <button class="btn-secondary" onclick="doDisable2fa()">Disable 2FA</button>
-            <div id="twofaError"></div>
-          </div>
-        `;
+        twofaHTML = `<div class="twofa-section"><div class="twofa-status"><span>Two-Factor Auth</span><span class="twofa-badge on">Enabled</span></div><div class="form-group"><label>Enter 2FA code to disable</label><input type="text" id="disable2faCode" placeholder="000000" maxlength="6"></div><button class="btn-secondary" onclick="doDisable2fa()">Disable 2FA</button><div id="twofaError"></div></div>`;
       } else if (setup2faData) {
-        twofaHTML = `
-          <div class="twofa-section">
-            <div class="twofa-status">
-              <span>Two-Factor Auth</span>
-              <span class="twofa-badge off">Disabled</span>
-            </div>
-            <p style="color:#94a3b8;font-size:0.85rem;margin-bottom:8px;">Scan this QR code with your authenticator app:</p>
-            <div class="qr-container">
-              <img src="${setup2faData.qrDataUrl}" width="180" height="180" alt="QR Code">
-              <div class="secret-code">Manual key: ${setup2faData.secret}</div>
-            </div>
-            <div class="form-group">
-              <label>Enter the 6-digit code to verify</label>
-              <input type="text" id="enable2faCode" placeholder="000000" maxlength="6">
-            </div>
-            <button class="btn-primary" onclick="doEnable2fa()">Activate 2FA</button>
-            <button class="btn-secondary" onclick="setup2faData=null;renderProfilePanel()">Cancel</button>
-            <div id="twofaError"></div>
-          </div>
-        `;
+        twofaHTML = `<div class="twofa-section"><div class="twofa-status"><span>Two-Factor Auth</span><span class="twofa-badge off">Disabled</span></div><p style="color:#94a3b8;font-size:0.85rem;margin-bottom:8px;">Scan this QR code with your authenticator app:</p><div class="qr-container"><img src="${setup2faData.qrDataUrl}" width="180" height="180" alt="QR Code"><div class="secret-code">Manual key: ${setup2faData.secret}</div></div><div class="form-group"><label>Enter the 6-digit code to verify</label><input type="text" id="enable2faCode" placeholder="000000" maxlength="6"></div><button class="btn-primary" onclick="doEnable2fa()">Activate 2FA</button><button class="btn-secondary" onclick="setup2faData=null;renderProfilePanel()">Cancel</button><div id="twofaError"></div></div>`;
       } else {
-        twofaHTML = `
-          <div class="twofa-section">
-            <div class="twofa-status">
-              <span>Two-Factor Auth</span>
-              <span class="twofa-badge off">Disabled</span>
-            </div>
-            <button class="btn-secondary" onclick="doSetup2fa()">Set Up 2FA</button>
-            <div id="twofaError"></div>
-          </div>
-        `;
+        twofaHTML = `<div class="twofa-section"><div class="twofa-status"><span>Two-Factor Auth</span><span class="twofa-badge off">Disabled</span></div><button class="btn-secondary" onclick="doSetup2fa()">Set Up 2FA</button><div id="twofaError"></div></div>`;
       }
-
-      panel.innerHTML = `
-        <button class="modal-close" onclick="toggleProfile()">&times;</button>
-        <h2>${p.avatar || '😀'} ${p.username}</h2>
-        <div class="profile-stats">
-          <div class="stat-card">
-            <div class="stat-value">${p.games_played}</div>
-            <div class="stat-label">Games</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">${p.games_won}</div>
-            <div class="stat-label">Wins</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">${wp}%</div>
-            <div class="stat-label">Win Rate</div>
-          </div>
-        </div>
-        <div class="section-label">Avatar</div>
-        <div class="emoji-picker">
-          ${AVATARS.map(e => `<div class="emoji-option ${p.avatar === e ? 'selected' : ''}" onclick="pickAvatar('${e}')">${e}</div>`).join('')}
-        </div>
-        ${twofaHTML}
-        <button class="btn-secondary" style="margin-top:16px;color:#f87171;border-color:#7f1d1d" onclick="doLogout()">Log Out</button>
-      `;
+      panel.innerHTML = `<button class="modal-close" onclick="toggleProfile()">&times;</button><h2>${p.avatar||'😀'} ${p.username}</h2><div class="profile-stats"><div class="stat-card"><div class="stat-value">${p.games_played}</div><div class="stat-label">Games</div></div><div class="stat-card"><div class="stat-value">${p.games_won}</div><div class="stat-label">Wins</div></div><div class="stat-card"><div class="stat-value">${wp}%</div><div class="stat-label">Win Rate</div></div></div><div class="section-label">Avatar</div><div class="emoji-picker">${AVATARS.map(e=>`<div class="emoji-option ${p.avatar===e?'selected':''}" onclick="pickAvatar('${e}')">${e}</div>`).join('')}</div>${twofaHTML}<button class="btn-secondary" style="margin-top:16px;color:#f87171;border-color:#7f1d1d" onclick="doLogout()">Log Out</button>`;
     }
 
-    async function pickAvatar(emoji) {
-      const data = await api('/avatar', { avatar: emoji });
-      if (data.profile) {
-        userProfile = data.profile;
-        updateProfileBar();
-        renderProfilePanel();
-      }
-    }
+    async function pickAvatar(emoji) { const d = await api('/avatar',{avatar:emoji}); if(d.profile){userProfile=d.profile;updateProfileBar();renderProfilePanel();} }
+    async function doSetup2fa() { const d = await api('/setup-2fa'); if(d.error){show2faError(d.error);return;} setup2faData=d; renderProfilePanel(); }
+    async function doEnable2fa() { const code=document.getElementById('enable2faCode')?.value?.trim(); if(!code||code.length!==6)return show2faError('Enter 6-digit code'); const d=await api('/enable-2fa',{secret:setup2faData.secret,code}); if(d.error)return show2faError(d.error); userProfile=d.profile; setup2faData=null; updateProfileBar(); renderProfilePanel(); }
+    async function doDisable2fa() { const code=document.getElementById('disable2faCode')?.value?.trim(); if(!code||code.length!==6)return show2faError('Enter 6-digit code'); const d=await api('/disable-2fa',{code}); if(d.error)return show2faError(d.error); userProfile=d.profile; updateProfileBar(); renderProfilePanel(); }
+    function show2faError(msg) { const el=document.getElementById('twofaError'); if(el)el.innerHTML=`<p class="error-msg">${msg}</p>`; }
 
-    async function doSetup2fa() {
-      const data = await api('/setup-2fa');
-      if (data.error) { show2faError(data.error); return; }
-      setup2faData = data;
-      renderProfilePanel();
-    }
-
-    async function doEnable2fa() {
-      const code = document.getElementById('enable2faCode')?.value?.trim();
-      if (!code || code.length !== 6) return show2faError('Enter 6-digit code');
-      const data = await api('/enable-2fa', { secret: setup2faData.secret, code });
-      if (data.error) return show2faError(data.error);
-      userProfile = data.profile;
-      setup2faData = null;
-      updateProfileBar();
-      renderProfilePanel();
-    }
-
-    async function doDisable2fa() {
-      const code = document.getElementById('disable2faCode')?.value?.trim();
-      if (!code || code.length !== 6) return show2faError('Enter 6-digit code');
-      const data = await api('/disable-2fa', { code });
-      if (data.error) return show2faError(data.error);
-      userProfile = data.profile;
-      updateProfileBar();
-      renderProfilePanel();
-    }
-
-    function show2faError(msg) {
-      const el = document.getElementById('twofaError');
-      if (el) el.innerHTML = `<p class="error-msg">${msg}</p>`;
-    }
-
-    // ─── Game rendering ────────────────────────────
-    function getDisplayName(slot, state) {
-      if (!state || !state.slotNames) return 'Player ' + (slot + 1);
-      return state.slotNames[slot] || ('Player ' + (slot + 1));
-    }
-
-    function getTeamClass(slot) {
-      return (slot === 0 || slot === 3) ? 'team1' : 'team2';
-    }
-
-    function getSlotProfile(slot, state) {
-      if (!state || !state.slotProfiles) return null;
-      return state.slotProfiles[slot];
-    }
-
-    function profileMiniHTML(slot, state) {
-      const prof = getSlotProfile(slot, state);
-      if (!prof) return '';
-      const s = prof.stats || {};
-      const wp = s.games_played ? Math.round(s.games_won / s.games_played * 100) : 0;
-      return `
-        <div class="player-avatar">${prof.avatar || '😀'}</div>
-        <div class="player-stats-mini">${s.games_won || 0}W / ${s.games_played || 0}G (${wp}%)</div>
-      `;
-    }
-
-    // Lightweight partial updates (avoid full re-render)
-    function updateScoreboard(state) {
-      const s1 = document.querySelector('.score.team1');
-      const s2 = document.querySelector('.score.team2');
-      if (s1) s1.textContent = state.scores.team1;
-      if (s2) s2.textContent = state.scores.team2;
-    }
-
-    function updatePlayerCards(state) {
-      // Update disconnected status on existing cards
-      document.querySelectorAll('.player-card').forEach(card => {
-        const slot = parseInt(card.dataset.slot);
-        if (isNaN(slot)) return;
-        const slotInfo = state.slots[slot];
-        if (slotInfo && slotInfo.disconnected) {
-          card.classList.add('disconnected');
-          let badge = card.querySelector('.disconnected-badge');
-          if (!badge) {
-            badge = document.createElement('div');
-            badge.className = 'disconnected-badge';
-            badge.textContent = 'Disconnected';
-            card.appendChild(badge);
-          }
-        } else {
-          card.classList.remove('disconnected');
-          const badge = card.querySelector('.disconnected-badge');
-          if (badge) badge.remove();
-        }
-      });
-    }
-
-    function render(state) {
+    // ─── Home screen ───────────────────────────────
+    function renderHome() {
+      screen = 'home';
       const app = document.getElementById('app');
-      if (state.phase === 'waiting' || state.phase === 'countdown') {
-        renderWaiting(app, state);
-        return;
-      }
-      if (state.phase === 'gameOver') {
-        renderGameOver(app, state);
-        return;
-      }
-      renderGame(app, state);
+      const isLoggedIn = !!userProfile;
+      const roomsHTML = myRoomsList.length ? myRoomsList.map(r => `
+        <div class="room-item" onclick="socket.emit('joinRoom',{code:'${r.code}'})">
+          <div>
+            <span class="room-name">${r.name}</span>
+            <span class="room-code">${r.code}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="room-meta">${r.playerCount} online</span>
+            <span class="room-status ${r.status}">${r.status}</span>
+          </div>
+        </div>
+      `).join('') : '<div class="no-rooms">No rooms yet</div>';
+
+      app.innerHTML = `
+        <div class="home-screen">
+          <h1>Asocijacije</h1>
+          <div class="home-actions">
+            ${isLoggedIn ? `
+              <div class="home-card">
+                <h3>Create New Room</h3>
+                <div class="input-row">
+                  <input type="text" id="newRoomName" placeholder="Room name..." maxlength="40" value="${userProfile.username}'s Game">
+                  <button class="btn green" onclick="doCreateRoom()">Create</button>
+                </div>
+              </div>
+            ` : ''}
+            <div class="home-card">
+              <h3>Join Room</h3>
+              <div class="input-row">
+                <input type="text" id="joinCode" placeholder="Room code (e.g. ABC123)" maxlength="6" style="text-transform:uppercase;letter-spacing:2px;font-family:monospace"
+                  onkeydown="if(event.key==='Enter')doJoinRoom()">
+                <button class="btn" onclick="doJoinRoom()">Join</button>
+              </div>
+              <div id="homeError"></div>
+            </div>
+            ${isLoggedIn ? `
+              <div class="home-card">
+                <h3>My Rooms</h3>
+                <div class="my-rooms">${roomsHTML}</div>
+              </div>
+            ` : ''}
+          </div>
+        </div>`;
     }
 
-    function renderWaiting(app, state) {
+    function doCreateRoom() {
+      const name = document.getElementById('newRoomName')?.value?.trim() || 'Game Room';
+      socket.emit('createRoom', { name });
+    }
+
+    function doJoinRoom() {
+      const code = document.getElementById('joinCode')?.value?.trim().toUpperCase();
+      if (!code || code.length < 4) { const el = document.getElementById('homeError'); if(el) el.innerHTML='<p class="error-msg">Enter a valid room code</p>'; return; }
+      socket.emit('joinRoom', { code });
+    }
+
+    // ─── Room Lobby ────────────────────────────────
+    function renderRoomLobby(state) {
+      const app = document.getElementById('app');
       const slots = state.slots;
       const teamLabels = ['Team Blue', 'Team Gold', 'Team Gold', 'Team Blue'];
       const teamClasses = ['t1', 't2', 't2', 't1'];
       const hasJoined = mySlot >= 0;
       const isAdmin = mySlot === state.adminSlot;
+      const isRoomOwner = userProfile && state.createdBy === userProfile.id;
       const isCountdown = state.phase === 'countdown';
       const allFilled = slots.every(s => s !== null);
+
+      const inviteUrl = `${location.origin}?room=${state.code}`;
 
       let countdownHTML = '';
       if (isCountdown) {
         const mins = Math.floor(state.countdownLeft / 60);
-        const secs = state.countdownLeft % 60;
-        const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
+        const secs = (state.countdownLeft || 0) % 60;
+        const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2,'0')}` : `${secs}s`;
         countdownHTML = `
           <div class="countdown-display">
             <p class="countdown-label">Game starting in</p>
             <div class="countdown-timer">${timeStr}</div>
-            ${!allFilled ? '<p class="countdown-note">Waiting for all 4 players to join before timer ends...</p>' : ''}
+            ${!allFilled ? '<p class="countdown-note">Waiting for all 4 players...</p>' : ''}
             ${isAdmin ? '<button class="btn-cancel" onclick="socket.emit(\'cancelCountdown\')">Cancel</button>' : ''}
-          </div>
-        `;
+          </div>`;
       }
 
       let adminHTML = '';
@@ -1569,94 +1688,151 @@
               <button class="btn-countdown" onclick="socket.emit('startCountdown', 120)">2 min</button>
               <button class="btn-countdown" onclick="socket.emit('startCountdown', 300)">5 min</button>
             </div>
-            ${!allFilled ? '<p style="color:#64748b;font-size:0.85rem">Start Now requires all 4 slots filled. Countdown lets players join before time runs out.</p>' : ''}
-          </div>
-        `;
+            ${!allFilled ? '<p style="color:#64748b;font-size:0.85rem">Start Now requires all 4 slots. Use countdown to wait for players.</p>' : ''}
+          </div>`;
       }
 
-      // For name input: if logged in, use username; otherwise show input
+      let scheduleHTML = '';
+      if (isRoomOwner && !isCountdown) {
+        const curVal = state.scheduledStart ? new Date(state.scheduledStart).toISOString().slice(0,16) : '';
+        scheduleHTML = `
+          <div class="schedule-row">
+            <label style="color:#94a3b8;font-size:0.85rem;white-space:nowrap">Schedule start:</label>
+            <input type="datetime-local" id="scheduleInput" value="${curVal}" onchange="doSetSchedule()">
+          </div>`;
+      }
+
       const nameValue = userProfile ? userProfile.username : myName;
       const nameDisabled = userProfile ? 'disabled' : '';
 
       app.innerHTML = `
         <div class="waiting-screen">
-          <h1>Asocijacije</h1>
-          <p class="subtitle">${isCountdown ? 'Get ready!' : `Waiting for players... (${slots.filter(s => s).length}/4)`}</p>
+          <button class="btn-back" onclick="doLeaveRoom()">← Back to Home</button>
+          <h1>${state.name || 'Asocijacije'}</h1>
+          <p class="subtitle">${isCountdown ? 'Get ready!' : `Room Lobby (${slots.filter(s=>s).length}/4)`}</p>
+          <div class="invite-section">
+            <div class="invite-label">Invite Code</div>
+            <div class="invite-code">${state.code}</div>
+            <div class="invite-link" onclick="navigator.clipboard.writeText('${inviteUrl}');this.textContent='Copied!';setTimeout(()=>this.textContent='${inviteUrl}',2000)">${inviteUrl}</div>
+          </div>
           ${!hasJoined ? `
-            <div class="name-input-row">
+            <div class="name-input-row" style="margin-top:16px">
               <label>Your name:</label>
               <input type="text" id="nameInput" placeholder="Enter your name..." maxlength="20" value="${nameValue}" ${nameDisabled}>
             </div>
-            <p class="status-text" style="margin-bottom:16px">${isCountdown ? 'Hurry! Pick a slot before the timer runs out' : 'Click an empty slot to join'}</p>
+            <p class="status-text" style="margin-bottom:16px">Click an empty slot to join</p>
           ` : ''}
           <div class="slot-grid">
             ${slots.map((s, i) => {
               const isTaken = s !== null;
               const isMe = i === mySlot;
               const canJoin = !isTaken && !hasJoined;
-              const displayName = state.slotNames[i] || ('Player ' + (i + 1));
+              const displayName = state.slotNames[i] || ('Player '+(i+1));
               const isSlotAdmin = i === state.adminSlot;
-              const prof = getSlotProfile(i, state);
+              const prof = state.slotProfiles ? state.slotProfiles[i] : null;
+
+              // Move buttons: admin can move occupied slots to empty ones
+              let moveHTML = '';
+              if (isAdmin && isTaken && !isCountdown) {
+                const empties = [0,1,2,3].filter(j => j !== i && !slots[j]);
+                if (empties.length) {
+                  moveHTML = `<div class="move-arrows">${empties.map(j => `<button class="move-btn" onclick="event.stopPropagation();socket.emit('movePlayer',{fromSlot:${i},toSlot:${j}})">→ Slot ${j+1}</button>`).join('')}</div>`;
+                }
+              }
+
               return `
-              <div class="slot-btn ${isTaken ? 'taken' : ''} ${isMe ? 'is-me' : ''} ${canJoin ? 'available' : ''}"
+              <div class="slot-btn ${isTaken?'taken':''} ${isMe?'is-me':''} ${canJoin?'available':''}"
                 ${canJoin ? `onclick="joinSlot(${i})"` : ''}>
                 <div class="team-label ${teamClasses[i]}">${teamLabels[i]}</div>
                 ${isTaken ? `
-                  ${prof ? `<div class="slot-avatar">${prof.avatar || '😀'}</div>` : ''}
-                  ${displayName}${isSlotAdmin ? '<span class="admin-badge">Admin</span>' : ''} ${isMe ? '(You)' : ''}
+                  ${prof ? `<div class="slot-avatar">${prof.avatar||'😀'}</div>` : ''}
+                  ${displayName}${isSlotAdmin?'<span class="admin-badge">Admin</span>':''} ${isMe?'(You)':''}
                   ${prof ? `<div class="slot-stats">${(prof.stats?.games_won||0)}W / ${(prof.stats?.games_played||0)}G</div>` : ''}
-                  ${s && s.disconnected ? '<div class="disconnected-badge">Disconnected</div>' : ''}
+                  ${moveHTML}
                 ` : 'Open slot...'}
-              </div>
-            `}).join('')}
+              </div>`;
+            }).join('')}
           </div>
           ${countdownHTML}
+          ${scheduleHTML}
           ${adminHTML}
-        </div>
-      `;
+        </div>`;
 
-      if (!hasJoined && !userProfile) {
-        const nameInput = document.getElementById('nameInput');
-        if (nameInput) nameInput.focus();
-      }
+      if (!hasJoined && !userProfile) document.getElementById('nameInput')?.focus();
+    }
+
+    function doLeaveRoom() {
+      socket.emit('leaveRoom');
+      // Clean URL
+      if (window.history.replaceState) window.history.replaceState({}, '', location.pathname);
+    }
+
+    function doSetSchedule() {
+      const val = document.getElementById('scheduleInput')?.value;
+      socket.emit('setSchedule', { scheduledStart: val ? new Date(val).toISOString() : null });
     }
 
     function joinSlot(slot) {
       const nameInput = document.getElementById('nameInput');
-      const name = nameInput ? nameInput.value.trim() : '';
-      if (!name) {
-        if (nameInput) { nameInput.style.borderColor = '#ef4444'; nameInput.focus(); }
-        return;
-      }
+      const name = nameInput ? nameInput.value.trim() : (userProfile ? userProfile.username : '');
+      if (!name) { if (nameInput) { nameInput.style.borderColor = '#ef4444'; nameInput.focus(); } return; }
       myName = name;
       socket.emit('joinSlot', { slot, name });
+    }
+
+    // ─── Game rendering ────────────────────────────
+    function getDisplayName(slot, state) {
+      if (!state || !state.slotNames) return 'Player ' + (slot + 1);
+      return state.slotNames[slot] || ('Player ' + (slot + 1));
+    }
+
+    function getTeamClass(slot) { return (slot === 0 || slot === 3) ? 'team1' : 'team2'; }
+
+    function getSlotProfile(slot, state) { return state?.slotProfiles?.[slot] || null; }
+
+    function updateScoreboard(state) {
+      const s1 = document.querySelector('.score.team1'), s2 = document.querySelector('.score.team2');
+      if (s1) s1.textContent = state.scores.team1;
+      if (s2) s2.textContent = state.scores.team2;
+    }
+
+    function updatePlayerCards(state) {
+      document.querySelectorAll('.player-card').forEach(card => {
+        const slot = parseInt(card.dataset.slot);
+        if (isNaN(slot)) return;
+        const slotInfo = state.slots[slot];
+        if (slotInfo?.disconnected) {
+          card.classList.add('disconnected');
+          if (!card.querySelector('.disconnected-badge')) { const b = document.createElement('div'); b.className='disconnected-badge'; b.textContent='Disconnected'; card.appendChild(b); }
+        } else {
+          card.classList.remove('disconnected');
+          const b = card.querySelector('.disconnected-badge'); if (b) b.remove();
+        }
+      });
+    }
+
+    function renderGameView(state) {
+      const app = document.getElementById('app');
+      if (state.phase === 'gameOver') { renderGameOver(app, state); return; }
+      renderGame(app, state);
     }
 
     function renderGameOver(app, state) {
       const winner = state.scores.team1 > state.scores.team2 ? 'team1' : 'team2';
       const n = state.slotNames || ['P1','P2','P3','P4'];
-      const winnerName = winner === 'team1' ? `Team Blue (${n[0] || 'P1'} & ${n[3] || 'P4'})` : `Team Gold (${n[1] || 'P2'} & ${n[2] || 'P3'})`;
+      const winnerName = winner === 'team1' ? `Team Blue (${n[0]||'P1'} & ${n[3]||'P4'})` : `Team Gold (${n[1]||'P2'} & ${n[2]||'P3'})`;
       const winnerClass = winner === 'team1' ? 'winner-team1' : 'winner-team2';
-
-      // Refresh own profile if logged in (stats updated)
-      if (userProfile) {
-        apiGet('/me').then(d => { if (d.profile) { userProfile = d.profile; updateProfileBar(); } });
-      }
-
+      if (userProfile) apiGet('/me').then(d => { if(d.profile){userProfile=d.profile;updateProfileBar();} });
       app.innerHTML = `
         <div class="waiting-screen">
           <div class="game-over">
             <h1 class="${winnerClass}">${winnerName} Wins!</h1>
-            <div class="scoreboard">
-              <span class="score team1">${state.scores.team1}</span>
-              <span class="score-divider">:</span>
-              <span class="score team2">${state.scores.team2}</span>
-            </div>
-            <p style="color:#94a3b8; margin-bottom:8px;">Team Blue (${n[0] || 'P1'} & ${n[3] || 'P4'}) vs Team Gold (${n[1] || 'P2'} & ${n[2] || 'P3'})</p>
+            <div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div>
+            <p style="color:#94a3b8;margin-bottom:8px;">Team Blue (${n[0]||'P1'} & ${n[3]||'P4'}) vs Team Gold (${n[1]||'P2'} & ${n[2]||'P3'})</p>
             <button class="btn-reset" onclick="socket.emit('resetGame')">Play Again</button>
+            <button class="btn-back" style="margin-top:8px" onclick="doLeaveRoom()">← Back to Home</button>
           </div>
-        </div>
-      `;
+        </div>`;
     }
 
     function renderGame(app, state) {
@@ -1669,182 +1845,68 @@
         const isMe = slot === mySlot;
         const teamClass = getTeamClass(slot);
         const prof = getSlotProfile(slot, state);
-
-        let role = '';
-        let roleHighlight = false;
-
+        let role = '', roleHighlight = false;
         if (ct && phase !== 'roundOver') {
-          if (slot === ct.secretHolder && phase === 'secret') {
-            role = 'Setting secret word...';
-            roleHighlight = true;
-          } else if (slot === ct.clueGiver && phase === 'clue') {
-            role = 'Giving clue...';
-            roleHighlight = true;
-          } else if (slot === ct.guesser && phase === 'guess') {
-            role = 'Guessing!';
-            roleHighlight = true;
-          } else if (slot === ct.secretHolder) {
-            role = 'Secret holder';
-          } else if (slot === ct.clueGiver) {
-            role = 'Next clue';
-          } else if (slot === ct.guesser) {
-            role = 'Next guess';
-          }
+          if (slot===ct.secretHolder && phase==='secret') { role='Setting secret word...'; roleHighlight=true; }
+          else if (slot===ct.clueGiver && phase==='clue') { role='Giving clue...'; roleHighlight=true; }
+          else if (slot===ct.guesser && phase==='guess') { role='Guessing!'; roleHighlight=true; }
+          else if (slot===ct.secretHolder) { role='Secret holder'; }
+          else if (slot===ct.clueGiver) { role='Next clue'; }
+          else if (slot===ct.guesser) { role='Next guess'; }
         }
-
-        const isActive = ct && (
-          (phase === 'secret' && slot === ct.secretHolder) ||
-          (phase === 'clue' && slot === ct.clueGiver) ||
-          (phase === 'guess' && slot === ct.guesser)
-        );
-
+        const isActive = ct && ((phase==='secret'&&slot===ct.secretHolder)||(phase==='clue'&&slot===ct.clueGiver)||(phase==='guess'&&slot===ct.guesser));
         let statsHTML = '';
-        if (prof && prof.stats) {
-          const s = prof.stats;
-          const wp = s.games_played ? Math.round(s.games_won / s.games_played * 100) : 0;
-          statsHTML = `<div class="player-stats-mini">${s.games_won}W / ${s.games_played}G (${wp}%)</div>`;
-        }
-
+        if (prof?.stats) { const s=prof.stats; const wp=s.games_played?Math.round(s.games_won/s.games_played*100):0; statsHTML=`<div class="player-stats-mini">${s.games_won}W / ${s.games_played}G (${wp}%)</div>`; }
         const slotInfo = state.slots[slot];
-        const isDisconnected = slotInfo && slotInfo.disconnected;
-
-        return `
-          <div class="player-corner ${position}">
-            <div class="player-card ${teamClass} ${isEmpty && !isDisconnected ? 'empty' : ''} ${isMe ? 'is-me' : ''} ${isActive ? 'active' : ''} ${isDisconnected ? 'disconnected' : ''}" data-slot="${slot}">
-              ${prof ? `<div class="player-avatar">${prof.avatar || '😀'}</div>` : ''}
-              <div class="player-name">${getDisplayName(slot, state)}${isMe ? ' (You)' : ''}</div>
-              ${statsHTML}
-              ${isDisconnected ? '<div class="disconnected-badge">Disconnected</div>' : ''}
-              <div class="player-role ${roleHighlight ? 'highlight' : ''}">${role}</div>
-            </div>
-          </div>
-        `;
+        const isDisconnected = slotInfo?.disconnected;
+        return `<div class="player-corner ${position}"><div class="player-card ${teamClass} ${isEmpty&&!isDisconnected?'empty':''} ${isMe?'is-me':''} ${isActive?'active':''} ${isDisconnected?'disconnected':''}" data-slot="${slot}">${prof?`<div class="player-avatar">${prof.avatar||'😀'}</div>`:''}<div class="player-name">${getDisplayName(slot,state)}${isMe?' (You)':''}</div>${statsHTML}${isDisconnected?'<div class="disconnected-badge">Disconnected</div>':''}<div class="player-role ${roleHighlight?'highlight':''}">${role}</div></div></div>`;
       }
 
-      let centerHTML = '';
+      let centerHTML = `<div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div>`;
 
-      centerHTML += `
-        <div class="scoreboard">
-          <span class="score team1">${state.scores.team1}</span>
-          <span class="score-divider">:</span>
-          <span class="score team2">${state.scores.team2}</span>
-        </div>
-      `;
-
-      if (state.secretWord) {
-        centerHTML += `<div class="secret-word-display">Secret: ${state.secretWord}</div>`;
-      }
+      if (state.secretWord) centerHTML += `<div class="secret-word-display">Secret: ${state.secretWord}</div>`;
 
       if (state.clues.length > 0) {
-        centerHTML += `<div class="clue-list">`;
+        centerHTML += '<div class="clue-list">';
         state.clues.forEach(c => {
-          const entryTeam = getTeamClass(c.from);
-          const myTeam = getTeamClass(mySlot);
-          const isMyTeam = entryTeam === myTeam;
-          const isWrong = c.wrong;
-          centerHTML += `
-            <div class="clue-entry ${entryTeam} ${isMyTeam ? 'my-team' : ''} ${isWrong ? 'wrong-guess' : ''}">
-              <span class="clue-player ${entryTeam}">${getDisplayName(c.from, state)}</span>
-              <span class="clue-word">${c.word}</span>
-              <span class="clue-type ${isWrong ? 'type-miss' : 'type-clue'}">${isWrong ? '✗ miss' : 'clue'}</span>
-            </div>
-          `;
+          const entryTeam=getTeamClass(c.from); const myTeam=getTeamClass(mySlot); const isMyTeam=entryTeam===myTeam;
+          centerHTML += `<div class="clue-entry ${entryTeam} ${isMyTeam?'my-team':''} ${c.wrong?'wrong-guess':''}"><span class="clue-player ${entryTeam}">${getDisplayName(c.from,state)}</span><span class="clue-word">${c.word}</span><span class="clue-type ${c.wrong?'type-miss':'type-clue'}">${c.wrong?'✗ miss':'clue'}</span></div>`;
         });
-        centerHTML += `</div>`;
+        centerHTML += '</div>';
       }
 
-      if (phase === 'guess') {
-        const safe = state.timeLeft > 10;
-        centerHTML += `<div class="timer ${safe ? 'safe' : ''}">${state.timeLeft}s</div>`;
-      }
+      if (phase === 'guess') { const safe=state.timeLeft>10; centerHTML += `<div class="timer ${safe?'safe':''}">${state.timeLeft}s</div>`; }
 
       if (phase === 'secret') {
         if (mySlot === ct.secretHolder) {
-          centerHTML += `
-            <p class="status-text">Type the secret word (only ${getDisplayName(getReceiver(state), state)} will see it)</p>
-            <div class="input-area">
-              <input type="text" id="secretInput" placeholder="Secret word..." autofocus
-                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                onkeydown="if(event.key==='Enter')submitSecret()">
-              <button onclick="submitSecret()">Set Word</button>
-            </div>
-          `;
+          centerHTML += `<p class="status-text">Type the secret word (only ${getDisplayName((state.roundStarter+1)%4, state)} will see it)</p><div class="input-area"><input type="text" id="secretInput" placeholder="Secret word..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitSecret()"><button onclick="submitSecret()">Set Word</button></div>`;
         } else {
-          centerHTML += `<p class="status-text">${getDisplayName(ct.secretHolder, state)} is choosing the secret word...</p>`;
+          centerHTML += `<p class="status-text">${getDisplayName(ct.secretHolder,state)} is choosing the secret word...</p>`;
         }
       } else if (phase === 'clue') {
         if (mySlot === ct.clueGiver) {
-          centerHTML += `
-            <p class="status-text">Type ONE word as a clue for ${getDisplayName(ct.guesser, state)}</p>
-            <div class="input-area">
-              <input type="text" id="clueInput" placeholder="One word clue..." autofocus
-                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                onkeydown="if(event.key==='Enter')submitClue()">
-              <button onclick="submitClue()">Give Clue</button>
-            </div>
-          `;
+          centerHTML += `<p class="status-text">Type ONE word as a clue for ${getDisplayName(ct.guesser,state)}</p><div class="input-area"><input type="text" id="clueInput" placeholder="One word clue..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitClue()"><button onclick="submitClue()">Give Clue</button></div>`;
         } else {
-          centerHTML += `<p class="status-text">${getDisplayName(ct.clueGiver, state)} is thinking of a clue...</p>`;
+          centerHTML += `<p class="status-text">${getDisplayName(ct.clueGiver,state)} is thinking of a clue...</p>`;
         }
       } else if (phase === 'guess') {
         if (mySlot === ct.guesser) {
-          centerHTML += `
-            <p class="status-text">Guess the secret word!</p>
-            <div class="input-area">
-              <input type="text" id="guessInput" placeholder="Your guess..." autofocus
-                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
-                onkeydown="if(event.key==='Enter')submitGuess()">
-              <button onclick="submitGuess()">Guess</button>
-            </div>
-          `;
+          centerHTML += `<p class="status-text">Guess the secret word!</p><div class="input-area"><input type="text" id="guessInput" placeholder="Your guess..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitGuess()"><button onclick="submitGuess()">Guess</button></div>`;
         } else {
-          centerHTML += `<p class="status-text">${getDisplayName(ct.guesser, state)} is guessing...</p>`;
+          centerHTML += `<p class="status-text">${getDisplayName(ct.guesser,state)} is guessing...</p>`;
         }
       } else if (phase === 'roundOver') {
-        centerHTML += `<div class="round-over-msg">Correct! Point scored!</div>`;
+        centerHTML += '<div class="round-over-msg">Correct! Point scored!</div>';
       }
 
-      app.innerHTML = `
-        <div class="game-container">
-          ${playerCard(0, 'top-left')}
-          ${playerCard(1, 'top-right')}
-          <div class="center-area">${centerHTML}</div>
-          ${playerCard(2, 'bottom-left')}
-          ${playerCard(3, 'bottom-right')}
-        </div>
-      `;
-
+      app.innerHTML = `<div class="game-container">${playerCard(0,'top-left')}${playerCard(1,'top-right')}<div class="center-area">${centerHTML}</div>${playerCard(2,'bottom-left')}${playerCard(3,'bottom-right')}</div>`;
       const input = document.querySelector('.input-area input');
       if (input) input.focus();
     }
 
-    function getReceiver(state) {
-      return (state.roundStarter + 1) % 4;
-    }
-
-    function submitSecret() {
-      const input = document.getElementById('secretInput');
-      if (input && input.value.trim()) {
-        socket.emit('submitSecret', input.value.trim());
-        input.value = '';
-      }
-    }
-
-    function submitClue() {
-      const input = document.getElementById('clueInput');
-      if (input && input.value.trim()) {
-        socket.emit('submitClue', input.value.trim());
-        input.value = '';
-      }
-    }
-
-    function submitGuess() {
-      const input = document.getElementById('guessInput');
-      if (input && input.value.trim()) {
-        socket.emit('submitGuess', input.value.trim());
-        input.value = '';
-      }
-    }
+    function submitSecret() { const i=document.getElementById('secretInput'); if(i&&i.value.trim()){socket.emit('submitSecret',i.value.trim());i.value='';} }
+    function submitClue() { const i=document.getElementById('clueInput'); if(i&&i.value.trim()){socket.emit('submitClue',i.value.trim());i.value='';} }
+    function submitGuess() { const i=document.getElementById('guessInput'); if(i&&i.value.trim()){socket.emit('submitGuess',i.value.trim());i.value='';} }
 
     // ─── Init ──────────────────────────────────────
     tryAutoLogin();

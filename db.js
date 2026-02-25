@@ -28,10 +28,41 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL DEFAULT 'Game Room',
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    scheduled_start TEXT DEFAULT NULL,
+    status TEXT DEFAULT 'lobby',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Prepared statements
 const stmts = {
+  // Rooms
+  createRoom: db.prepare(`
+    INSERT INTO rooms (code, name, created_by, scheduled_start) VALUES (?, ?, ?, ?)
+  `),
+  findRoomByCode: db.prepare(`
+    SELECT * FROM rooms WHERE code = ?
+  `),
+  updateRoomStatus: db.prepare(`
+    UPDATE rooms SET status = ?, updated_at = datetime('now') WHERE code = ?
+  `),
+  updateRoomSchedule: db.prepare(`
+    UPDATE rooms SET scheduled_start = ?, updated_at = datetime('now') WHERE code = ?
+  `),
+  getRoomsByUser: db.prepare(`
+    SELECT * FROM rooms WHERE created_by = ? ORDER BY created_at DESC LIMIT 20
+  `),
+  deleteRoom: db.prepare(`
+    DELETE FROM rooms WHERE code = ? AND created_by = ?
+  `),
+
   createUser: db.prepare(`
     INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)
   `),
