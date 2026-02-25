@@ -645,6 +645,24 @@ io.on('connection', (socket) => {
     socket.emit('roomCreated', { code, name: roomName });
   });
 
+  // List all active public rooms
+  socket.on('listPublicRooms', () => {
+    const result = [];
+    for (const [code, room] of rooms) {
+      const playerCount = Object.keys(room.players).length;
+      const slotsTaken = room.slots.filter(s => s !== null).length;
+      result.push({
+        code,
+        name: room.name,
+        status: room.phase,
+        playerCount,
+        slotsTaken,
+        slotsTotal: 4,
+      });
+    }
+    socket.emit('publicRooms', result);
+  });
+
   // List rooms created by the current user
   socket.on('listMyRooms', () => {
     if (!authUser) { socket.emit('myRooms', []); return; }
