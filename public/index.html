@@ -11,8 +11,11 @@
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: #0f172a;
       color: #e2e8f0;
-      height: 100vh;
-      overflow: hidden;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
     }
 
     /* Layout: 4 corners + center */
@@ -309,8 +312,8 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      height: 100vh;
+      min-height: 100vh;
+      padding-bottom: 40px;
     }
 
     .waiting-screen h1 {
@@ -1013,10 +1016,9 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      height: 100vh;
+      min-height: 100vh;
       gap: 20px;
-      padding: 20px;
+      padding: 20px 20px 40px;
     }
 
     .home-screen h1 {
@@ -1447,6 +1449,33 @@
       text-align: center;
       padding: 12px;
     }
+
+    /* Mobile fixes */
+    @media (max-width: 768px) {
+      .home-screen h1, .waiting-screen h1, .auth-screen h1 { font-size: 1.8rem; }
+      .waiting-screen { padding: 16px 12px 40px; }
+      .home-screen { padding: 16px 12px 40px; }
+      .home-actions { width: 100%; }
+      .home-card { max-width: 100%; }
+      .invite-section { max-width: 100%; word-break: break-all; }
+      .invite-link { font-size: 0.7rem; }
+      .slot-grid { gap: 8px; }
+      .slot-card { padding: 12px 10px; font-size: 0.85rem; }
+      .lobby-chat { max-width: 100%; }
+      .chat-messages { height: 120px; }
+      .player-corner { padding: 8px; }
+      .player-card { padding: 10px 6px; min-width: 100px; }
+      .player-name { font-size: 0.8rem; }
+      .player-role { font-size: 0.7rem; }
+      .center-area { padding: 8px; min-height: 150px; }
+      .input-area input { font-size: 16px; } /* prevents iOS zoom on focus */
+      .chat-input-row input { font-size: 16px; }
+      .gameover-players { flex-direction: column; gap: 8px; }
+      .gameover-player { min-width: unset; width: 100%; }
+      .schedule-row { flex-direction: column; gap: 4px; }
+      .friend-item { flex-wrap: wrap; }
+      .friend-actions { flex-shrink: 0; }
+    }
   </style>
 </head>
 <body>
@@ -1789,7 +1818,7 @@
             <div class="auth-box">
               <h2>Log In</h2>
               <div class="form-group"><label>Email</label><input type="email" id="authEmail" placeholder="you@example.com"></div>
-              <div class="form-group"><label>Password</label><input type="password" id="authPassword" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+              <div class="form-group"><label>Password</label><input type="password" id="authPassword" placeholder="Your password" enterkeyhint="go" onkeydown="if(event.key==='Enter')doLogin()" onkeypress="if(event.keyCode===13)doLogin()"></div>
               <button class="btn-primary" onclick="doLogin()">Log In</button>
               <button class="btn-secondary" onclick="authScreen='register';renderAuth()">Create Account</button>
               <div id="authError"></div>
@@ -1805,7 +1834,7 @@
               <h2>Create Account</h2>
               <div class="form-group"><label>Username</label><input type="text" id="regUsername" placeholder="Pick a username" maxlength="20"></div>
               <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="you@example.com"></div>
-              <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Min 6 characters" onkeydown="if(event.key==='Enter')doRegister()"></div>
+              <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="Min 6 characters" enterkeyhint="go" onkeydown="if(event.key==='Enter')doRegister()" onkeypress="if(event.keyCode===13)doRegister()"></div>
               <button class="btn-primary" onclick="doRegister()">Sign Up</button>
               <button class="btn-secondary" onclick="authScreen='login';renderAuth()">Back to Login</button>
               <div id="authError"></div>
@@ -1820,7 +1849,7 @@
             <div class="auth-box">
               <h2>Two-Factor Authentication</h2>
               <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:12px;">Enter the 6-digit code from your authenticator app.</p>
-              <div class="form-group"><label>2FA Code</label><input type="text" id="tfaCode" placeholder="000000" maxlength="6" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')doVerify2fa()"></div>
+              <div class="form-group"><label>2FA Code</label><input type="text" id="tfaCode" placeholder="000000" maxlength="6" autocomplete="one-time-code" enterkeyhint="go" onkeydown="if(event.key==='Enter')doVerify2fa()" onkeypress="if(event.keyCode===13)doVerify2fa()"></div>
               <button class="btn-primary" onclick="doVerify2fa()">Verify</button>
               <button class="btn-secondary" onclick="authScreen='login';pending2faToken=null;renderAuth()">Back</button>
               <div id="authError"></div>
@@ -1944,8 +1973,8 @@
             <div class="home-card">
               <h3>Join Room</h3>
               <div class="input-row">
-                <input type="text" id="joinCode" placeholder="Room code (e.g. ABC123)" maxlength="6" style="text-transform:uppercase;letter-spacing:2px;font-family:monospace"
-                  onkeydown="if(event.key==='Enter')doJoinRoom()">
+                <input type="text" id="joinCode" placeholder="Room code (e.g. ABC123)" maxlength="6" style="text-transform:uppercase;letter-spacing:2px;font-family:monospace" enterkeyhint="go"
+                  onkeydown="if(event.key==='Enter')doJoinRoom()" onkeypress="if(event.keyCode===13)doJoinRoom()">
                 <button class="btn" onclick="doJoinRoom()">Join</button>
               </div>
               <div id="homeError"></div>
@@ -2180,9 +2209,10 @@
               <h4>Chat</h4>
               <div class="chat-messages" id="chatMessages">${chatMessages.map(m => `<div class="chat-msg"><span class="chat-name">${m.name}:</span>${m.text}</div>`).join('')}</div>
               <div class="chat-input-row">
-                <input type="text" id="chatInput" placeholder="Type a message..." maxlength="200" autocomplete="off"
-                  onkeydown="if(event.key==='Enter'){doSendChat();event.preventDefault()}">
-                <button onclick="doSendChat()">Send</button>
+                <input type="text" id="chatInput" placeholder="Type a message..." maxlength="200" autocomplete="off" enterkeyhint="send"
+                  onkeydown="if(event.key==='Enter'){doSendChat();event.preventDefault()}"
+                  onkeypress="if(event.keyCode===13){doSendChat();event.preventDefault()}">
+                <button onclick="doSendChat()" type="button">Send</button>
               </div>
             </div>
           ` : ''}
@@ -2366,23 +2396,23 @@
         centerHTML += '</div>';
       }
 
-      if (phase === 'guess') { const safe=state.timeLeft>10; centerHTML += `<div class="timer ${safe?'safe':''}">${state.timeLeft}s</div>`; }
+      if (phase === 'guess' && state.guessTime !== 0) { const safe=state.timeLeft>10; centerHTML += `<div class="timer ${safe?'safe':''}">${state.timeLeft}s</div>`; }
 
       if (phase === 'secret') {
         if (mySlot === ct.secretHolder) {
-          centerHTML += `<p class="status-text">Type the secret word (only ${getDisplayName((state.roundStarter+1)%4, state)} will see it)</p><div class="input-area"><input type="text" id="secretInput" placeholder="Secret word..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitSecret()"><button onclick="submitSecret()">Set Word</button></div>`;
+          centerHTML += `<p class="status-text">Type the secret word (only ${getDisplayName((state.roundStarter+1)%4, state)} will see it)</p><div class="input-area"><input type="text" id="secretInput" placeholder="Secret word..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitSecret()" onkeypress="if(event.keyCode===13)submitSecret()" enterkeyhint="send"><button onclick="submitSecret()">Set Word</button></div>`;
         } else {
           centerHTML += `<p class="status-text">${getDisplayName(ct.secretHolder,state)} is choosing the secret word...</p>`;
         }
       } else if (phase === 'clue') {
         if (mySlot === ct.clueGiver) {
-          centerHTML += `<p class="status-text">Type ONE word as a clue for ${getDisplayName(ct.guesser,state)}</p><div class="input-area"><input type="text" id="clueInput" placeholder="One word clue..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitClue()"><button onclick="submitClue()">Give Clue</button></div>`;
+          centerHTML += `<p class="status-text">Type ONE word as a clue for ${getDisplayName(ct.guesser,state)}</p><div class="input-area"><input type="text" id="clueInput" placeholder="One word clue..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitClue()" onkeypress="if(event.keyCode===13)submitClue()" enterkeyhint="send"><button onclick="submitClue()">Give Clue</button></div>`;
         } else {
           centerHTML += `<p class="status-text">${getDisplayName(ct.clueGiver,state)} is thinking of a clue...</p>`;
         }
       } else if (phase === 'guess') {
         if (mySlot === ct.guesser) {
-          centerHTML += `<p class="status-text">Guess the secret word!</p><div class="input-area"><input type="text" id="guessInput" placeholder="Your guess..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitGuess()"><button onclick="submitGuess()">Guess</button></div>`;
+          centerHTML += `<p class="status-text">Guess the secret word!</p><div class="input-area"><input type="text" id="guessInput" placeholder="Your guess..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitGuess()" onkeypress="if(event.keyCode===13)submitGuess()" enterkeyhint="send"><button onclick="submitGuess()">Guess</button></div>`;
         } else {
           centerHTML += `<p class="status-text">${getDisplayName(ct.guesser,state)} is guessing...</p>`;
         }
