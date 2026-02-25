@@ -2416,7 +2416,7 @@
 
       if (phase === 'secret') {
         if (mySlot === ct.secretHolder) {
-          centerHTML += `<p class="status-text">Type the secret word (only ${getDisplayName((state.roundStarter+1)%4, state)} will see it)</p><div class="input-area"><input type="text" id="secretInput" placeholder="Secret word..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitSecret()" onkeypress="if(event.keyCode===13)submitSecret()" enterkeyhint="send"><button onclick="submitSecret()">Set Word</button></div>`;
+          centerHTML += `<p class="status-text">Type the secret word (only ${getDisplayName(ct.receiver, state)} will see it)</p><div class="input-area"><input type="text" id="secretInput" placeholder="Secret word..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitSecret()" onkeypress="if(event.keyCode===13)submitSecret()" enterkeyhint="send"><button onclick="submitSecret()">Set Word</button></div>`;
         } else {
           centerHTML += `<p class="status-text">${getDisplayName(ct.secretHolder,state)} is choosing the secret word...</p>`;
         }

@@ -29,23 +29,29 @@ function generateCode() {
 }
 
 // Teams: P1(slot0) + P4(slot3) = team1, P2(slot1) + P3(slot2) = team2
-// Round rotation (circular): P1→P2→P3→P4→P1→...
-// Pattern: secretHolder=S, receiver=R=(S+1)%4
-//   Even turns: R clues → (S+3)%4 guesses (receiver's teammate guesses)
-//   Odd turns:  S clues → (S+2)%4 guesses (secretHolder's teammate guesses)
+// Two rounds alternate:
+//   Round A (0): P1 secret → P2 sees → P2 clue → P3 guess → miss: P1 clue → P4 guess → repeat
+//   Round B (1): P2 secret → P4 sees → P4 clue → P1 guess → miss: P2 clue → P3 guess → repeat
 
 function getTeam(slot) {
   return (slot === 0 || slot === 3) ? 'team1' : 'team2';
 }
 
 function getRoundConfig(roundStarter, turnWithinRound) {
-  const S = roundStarter;
-  const R = (S + 1) % 4;
-  // Even turns: receiver clues, opposite-team partner guesses
-  // Odd turns:  secretHolder clues, their teammate guesses
-  const clueGiver = (turnWithinRound % 2 === 0) ? R : S;
-  const guesser   = (turnWithinRound % 2 === 0) ? (S + 3) % 4 : (S + 2) % 4;
-  return { secretHolder: S, receiver: R, clueGiver, guesser };
+  // roundStarter alternates 0 and 1
+  if (roundStarter === 0) {
+    // Round A: P1(0) secret → P2(1) sees it
+    // T0: P2(1) clue → P3(2) guess | T1: P1(0) clue → P4(3) guess | repeat
+    const clueGiver = (turnWithinRound % 2 === 0) ? 1 : 0;
+    const guesser   = (turnWithinRound % 2 === 0) ? 2 : 3;
+    return { secretHolder: 0, receiver: 1, clueGiver, guesser };
+  } else {
+    // Round B: P2(1) secret → P4(3) sees it
+    // T0: P4(3) clue → P1(0) guess | T1: P2(1) clue → P3(2) guess | repeat
+    const clueGiver = (turnWithinRound % 2 === 0) ? 3 : 1;
+    const guesser   = (turnWithinRound % 2 === 0) ? 0 : 2;
+    return { secretHolder: 1, receiver: 3, clueGiver, guesser };
+  }
 }
 
 class Room {
@@ -139,7 +145,7 @@ class Room {
         timeLeft: this.timeLeft,
         countdownLeft: this.countdownLeft,
         secretWord: null,
-        currentTurn: config ? { secretHolder: config.secretHolder, clueGiver: config.clueGiver, guesser: config.guesser } : null,
+        currentTurn: config ? { secretHolder: config.secretHolder, receiver: config.receiver, clueGiver: config.clueGiver, guesser: config.guesser } : null,
         roundStarter: this.roundStarter,
       };
 
@@ -169,7 +175,7 @@ class Room {
           timeLeft: this.timeLeft,
           countdownLeft: this.countdownLeft,
           secretWord: null,
-          currentTurn: config ? { secretHolder: config.secretHolder, clueGiver: config.clueGiver, guesser: config.guesser } : null,
+          currentTurn: config ? { secretHolder: config.secretHolder, receiver: config.receiver, clueGiver: config.clueGiver, guesser: config.guesser } : null,
           roundStarter: this.roundStarter,
         });
       }
@@ -489,7 +495,7 @@ class Room {
       const team = getTeam(player.slot);
       this.scores[team]++;
       if (this.checkWin()) return;
-      this.roundStarter = (this.roundStarter + 1) % 4;
+      this.roundStarter = this.roundStarter === 0 ? 1 : 0;
       this.phase = 'roundOver';
       this.broadcastGameState();
       setTimeout(() => {
