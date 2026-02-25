@@ -54,6 +54,7 @@ class Room {
     this.scheduledStart = null; // ISO string
     this.scheduleTimer = null;
     this.winScore = 10; // points needed to win
+    this.guessTime = 30; // seconds per guess (0 = unlimited)
 
     // Game state
     this.players = {}; // socketId -> { slot, name, userId, avatar, stats }
@@ -95,6 +96,7 @@ class Room {
       phase: this.phase,
       countdownLeft: this.countdownLeft,
       winScore: this.winScore,
+      guessTime: this.guessTime,
       slots: this.slots.map((s, idx) => {
         if (!s && !this.slotDisconnected[idx] && !this.slotReserved[idx]) return null;
         return { slot: idx, name: this.getSlotName(idx), connected: !!s && !this.slotDisconnected[idx], disconnected: this.slotDisconnected[idx] };
@@ -123,6 +125,7 @@ class Room {
         phase: this.phase,
         scores: this.scores,
         winScore: this.winScore,
+        guessTime: this.guessTime,
         slots: this.slots.map((s, idx) => (s || this.slotDisconnected[idx]) ? { slot: idx, name: this.getSlotName(idx), connected: !!s && !this.slotDisconnected[idx], disconnected: this.slotDisconnected[idx] } : null),
         slotNames: this.slotNames,
         slotProfiles: this.slotProfiles,
@@ -174,7 +177,13 @@ class Room {
   }
 
   startGuessTimer() {
-    this.timeLeft = 30;
+    if (this.guessTime === 0) {
+      // Unlimited mode — no timer
+      this.timeLeft = 0;
+      this.clearTimer();
+      return;
+    }
+    this.timeLeft = this.guessTime;
     this.clearTimer();
     this.timer = setInterval(() => {
       this.timeLeft--;
@@ -334,6 +343,11 @@ class Room {
     };
 
     if (this.adminSlot === -1) this.adminSlot = slot;
+
+    // Persist participant
+    if (player.userId) {
+      try { stmts.addParticipant.run(this.code, player.userId, slot); } catch(e) {}
+    }
 
     return { slot, name: trimmedName, reconnectToken: rToken };
   }
@@ -569,6 +583,9 @@ class Room {
         this.slotProfiles[slot] = null;
         this.slotDisconnected[slot] = false;
         this.slotReserved[slot] = null;
+        if (player.userId) {
+          try { stmts.removeParticipant.run(this.code, player.userId); } catch(e) {}
+        }
         if (this.phase === 'countdown') {
           this.clearTimer();
           this.phase = 'lobby';
@@ -692,6 +709,21 @@ io.on('connection', (socket) => {
     socket.emit('myRooms', result);
   });
 
+  socket.on('listMyGames', () => {
+    if (!authUser) { socket.emit('myGames', []); return; }
+    const games = stmts.getMyGames.all(authUser.id).map(g => {
+      const live = rooms.get(g.code);
+      return {
+        code: g.code,
+        name: g.name,
+        status: live ? live.phase : g.status,
+        playerCount: live ? Object.keys(live.players).length : 0,
+        mySlot: g.slot,
+      };
+    });
+    socket.emit('myGames', games);
+  });
+
   // Join a room
   socket.on('joinRoom', ({ code, reconnectToken: rToken } = {}) => {
     if (!code) return;
@@ -774,6 +806,7 @@ io.on('connection', (socket) => {
 
     // Also delete from DB (handles DB-only rooms from previous sessions)
     try { stmts.deleteRoom.run(code, authUser.id); } catch (e) {}
+    try { stmts.removeAllParticipants.run(code); } catch (e) {}
     console.log(`[${code}] Room deleted by ${authUser.username}`);
 
     // Refresh the caller's room list
@@ -904,6 +937,16 @@ io.on('connection', (socket) => {
     const score = parseInt(winScore);
     if (!score || score < 1 || score > 50) return;
     room.winScore = score;
+    room.broadcastLobby();
+  });
+
+  socket.on('setGuessTime', ({ guessTime } = {}) => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (!room || !authUser || room.createdBy !== authUser.id) return;
+    if (room.phase !== 'lobby' && room.phase !== 'waiting' && room.phase !== 'countdown') return;
+    const t = parseInt(guessTime);
+    if (isNaN(t) || ![0, 30, 60].includes(t)) return;
+    room.guessTime = t;
     room.broadcastLobby();
   });
 

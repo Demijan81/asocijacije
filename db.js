@@ -38,6 +38,14 @@ db.exec(`
     UNIQUE(user_id, friend_id)
   );
 
+  CREATE TABLE IF NOT EXISTS room_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_code TEXT NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    slot INTEGER NOT NULL,
+    UNIQUE(room_code, user_id)
+  );
+
   CREATE TABLE IF NOT EXISTS rooms (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT UNIQUE NOT NULL,
@@ -132,6 +140,24 @@ const stmts = {
   checkFriendship: db.prepare(`
     SELECT * FROM friendships WHERE
       ((user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?))
+  `),
+
+  // Room participants
+  addParticipant: db.prepare(`
+    INSERT OR REPLACE INTO room_participants (room_code, user_id, slot) VALUES (?, ?, ?)
+  `),
+  removeParticipant: db.prepare(`
+    DELETE FROM room_participants WHERE room_code = ? AND user_id = ?
+  `),
+  removeAllParticipants: db.prepare(`
+    DELETE FROM room_participants WHERE room_code = ?
+  `),
+  getMyGames: db.prepare(`
+    SELECT r.code, r.name, r.status, r.created_by, rp.slot
+    FROM room_participants rp
+    JOIN rooms r ON r.code = rp.room_code
+    WHERE rp.user_id = ? AND r.status != 'finished'
+    ORDER BY r.updated_at DESC LIMIT 20
   `),
 };
 

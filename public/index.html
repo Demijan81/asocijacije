@@ -1516,6 +1516,7 @@
     let chatMessages = [];
     let friendsList = [];
     let pendingRequests = [];
+    let myGamesList = [];
     let screen = 'auth'; // auth | home | room | game
 
     // ─── Socket setup ──────────────────────────────
@@ -1542,6 +1543,8 @@
         chatMessages = [];
         if (data.reconnectToken) sessionStorage.setItem('reconnectToken', data.reconnectToken);
         if (userProfile) socket.emit('listFriends');
+        // Update URL with permanent room link
+        if (window.history.replaceState) window.history.replaceState({}, '', '?room=' + data.code);
         screen = 'room';
       });
 
@@ -1655,7 +1658,7 @@
         mySlot = -1;
         screen = 'home';
         socket.emit('listPublicRooms');
-        if (userProfile) { socket.emit('listMyRooms'); socket.emit('listFriends'); }
+        if (userProfile) { socket.emit('listMyRooms'); socket.emit('listFriends'); socket.emit('listMyGames'); }
         renderHome();
       });
 
@@ -1670,6 +1673,11 @@
 
       socket.on('publicRooms', (list) => {
         publicRoomsList = list;
+        if (screen === 'home') renderHome();
+      });
+
+      socket.on('myGames', (list) => {
+        myGamesList = list;
         if (screen === 'home') renderHome();
       });
 
@@ -1724,6 +1732,7 @@
           socket.emit('listMyRooms');
           socket.emit('listPublicRooms');
           socket.emit('listFriends');
+          socket.emit('listMyGames');
           renderHome();
         }, 200);
       }
@@ -1945,6 +1954,25 @@
               <h3>Open Rooms <button class="btn-refresh" onclick="socket.emit('listPublicRooms')">↻</button></h3>
               <div class="my-rooms">${publicHTML}</div>
             </div>
+            ${isLoggedIn && myGamesList.length ? `
+              <div class="home-card">
+                <h3>My Games <button class="btn-refresh" onclick="socket.emit('listMyGames')">↻</button></h3>
+                <div class="my-rooms">${myGamesList.map(g => {
+                  const statusLabel = g.status === 'lobby' || g.status === 'waiting' || g.status === 'countdown' ? 'Waiting' : g.status === 'gameOver' ? 'Finished' : 'In Progress';
+                  return `
+                  <div class="room-item" onclick="socket.emit('joinRoom',{code:'${g.code}'})" style="cursor:pointer">
+                    <div>
+                      <span class="room-name">${g.name}</span>
+                      <span class="room-code">${g.code}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span class="room-meta">${g.playerCount} online</span>
+                      <span class="room-status ${g.status}">${statusLabel}</span>
+                    </div>
+                  </div>`;
+                }).join('')}</div>
+              </div>
+            ` : ''}
             ${isLoggedIn && myRoomsList.length ? `
               <div class="home-card">
                 <h3>My Rooms</h3>
@@ -2054,11 +2082,19 @@
       if (isRoomOwner && !isCountdown) {
         const curVal = state.scheduledStart ? new Date(state.scheduledStart).toISOString().slice(0,16) : '';
         const ws = state.winScore || 10;
+        const gt = state.guessTime != null ? state.guessTime : 30;
+        const gtOpts = [{v:30,l:'Blitz (30s)'},{v:60,l:'Normal (60s)'},{v:0,l:'Unlimited'}];
         scheduleHTML = `
           <div class="schedule-row">
             <label style="color:#94a3b8;font-size:0.85rem;white-space:nowrap">Points to win:</label>
             <select id="winScoreSelect" onchange="doSetWinScore()" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:0.9rem">
               ${[3,5,7,10,15,20].map(v => `<option value="${v}" ${v===ws?'selected':''}>${v}</option>`).join('')}
+            </select>
+          </div>
+          <div class="schedule-row">
+            <label style="color:#94a3b8;font-size:0.85rem;white-space:nowrap">Guess timer:</label>
+            <select id="guessTimeSelect" onchange="doSetGuessTime()" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:0.9rem">
+              ${gtOpts.map(o => `<option value="${o.v}" ${o.v===gt?'selected':''}>${o.l}</option>`).join('')}
             </select>
           </div>
           <div class="schedule-row">
@@ -2074,7 +2110,7 @@
         <div class="waiting-screen">
           <button class="btn-back" onclick="doLeaveRoom()">← Back to Home</button>
           <h1>${state.name || 'Asocijacije'}</h1>
-          <p class="subtitle">${isCountdown ? 'Get ready!' : `Room Lobby (${slots.filter(s=>s).length}/4)`} &middot; First to ${state.winScore || 10}</p>
+          <p class="subtitle">${isCountdown ? 'Get ready!' : `Room Lobby (${slots.filter(s=>s).length}/4)`} &middot; First to ${state.winScore || 10} &middot; ${state.guessTime === 0 ? '∞' : (state.guessTime || 30) + 's'}</p>
           <div class="invite-section">
             <div class="invite-label">Invite Code</div>
             <div class="invite-code">${state.code}</div>
@@ -2195,6 +2231,11 @@
       if (val) socket.emit('setWinScore', { winScore: parseInt(val) });
     }
 
+    function doSetGuessTime() {
+      const val = document.getElementById('guessTimeSelect')?.value;
+      if (val != null) socket.emit('setGuessTime', { guessTime: parseInt(val) });
+    }
+
     function doSetSchedule() {
       const val = document.getElementById('scheduleInput')?.value;
       socket.emit('setSchedule', { scheduledStart: val ? new Date(val).toISOString() : null });
@@ -2311,7 +2352,8 @@
         return `<div class="player-corner ${position}"><div class="player-card ${teamClass} ${isEmpty&&!isDisconnected?'empty':''} ${isMe?'is-me':''} ${isActive?'active':''} ${isDisconnected?'disconnected':''}" data-slot="${slot}">${prof?`<div class="player-avatar">${prof.avatar||'😀'}</div>`:''}<div class="player-name">${getDisplayName(slot,state)}${isMe?' (You)':''}</div>${statsHTML}${isDisconnected?'<div class="disconnected-badge">Disconnected</div>':''}<div class="player-role ${roleHighlight?'highlight':''}">${role}</div></div></div>`;
       }
 
-      let centerHTML = `<div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div><div style="color:#64748b;font-size:0.75rem;margin-top:-4px">First to ${state.winScore || 10}</div>`;
+      const timerLabel = state.guessTime === 0 ? '∞' : (state.guessTime || 30) + 's';
+      let centerHTML = `<div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div><div style="color:#64748b;font-size:0.75rem;margin-top:-4px">First to ${state.winScore || 10} · ${timerLabel}</div>`;
 
       if (state.secretWord) centerHTML += `<div class="secret-word-display">Secret: ${state.secretWord}</div>`;
 
