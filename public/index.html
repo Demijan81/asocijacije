@@ -1239,6 +1239,120 @@
     }
     .chat-input-row button:hover { background: #1d4ed8; }
 
+    /* Friends */
+    .friends-card { margin-top: 0; }
+    .friend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid #1e293b;
+      gap: 8px;
+    }
+    .friend-item:last-child { border-bottom: none; }
+    .friend-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .friend-avatar { font-size: 1.3rem; }
+    .friend-name {
+      font-weight: 600;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+    }
+    .friend-stats {
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+    .friend-online {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      flex-shrink: 0;
+    }
+    .friend-offline {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #475569;
+      flex-shrink: 0;
+    }
+    .friend-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .btn-friend {
+      background: #1e3a5f;
+      color: #60a5fa;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-friend:hover { background: #2563eb; color: #fff; }
+    .btn-friend.accept { background: #14532d; color: #4ade80; }
+    .btn-friend.accept:hover { background: #166534; color: #fff; }
+    .btn-friend.decline { background: #3b1c1c; color: #f87171; }
+    .btn-friend.decline:hover { background: #7f1d1d; color: #fff; }
+    .btn-friend.remove { background: transparent; color: #64748b; border: 1px solid #334155; }
+    .btn-friend.remove:hover { background: #7f1d1d; color: #f87171; border-color: #7f1d1d; }
+    .btn-friend.invite { background: #14532d; color: #4ade80; }
+    .btn-friend.invite:hover { background: #166534; color: #fff; }
+    .pending-badge {
+      background: #f59e0b;
+      color: #000;
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-left: 6px;
+    }
+
+    /* Game over player stats */
+    .gameover-players {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin: 16px 0;
+      width: 100%;
+      max-width: 420px;
+    }
+    .gameover-player {
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 10px 14px;
+      text-align: center;
+      flex: 1;
+      min-width: 90px;
+      max-width: 100px;
+    }
+    .gameover-player .gp-avatar { font-size: 1.5rem; }
+    .gameover-player .gp-name { font-size: 0.85rem; font-weight: 600; color: #e2e8f0; margin: 4px 0 2px; }
+    .gameover-player .gp-stats { font-size: 0.7rem; color: #64748b; }
+    .gameover-player .gp-team { font-size: 0.65rem; font-weight: 700; margin-top: 4px; }
+    .gameover-player .gp-team.t1 { color: #60a5fa; }
+    .gameover-player .gp-team.t2 { color: #fbbf24; }
+
+    /* Room invite toast */
+    .invite-toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 14px 18px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      z-index: 1000;
+      max-width: 300px;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .invite-toast p { margin: 0 0 8px; color: #e2e8f0; font-size: 0.9rem; }
+    .invite-toast .toast-actions { display: flex; gap: 8px; }
+
     /* Room lobby (replaces waiting screen) */
     .invite-section {
       background: #0f172a;
@@ -1400,6 +1514,8 @@
     let myRoomsList = [];
     let publicRoomsList = [];
     let chatMessages = [];
+    let friendsList = [];
+    let pendingRequests = [];
     let screen = 'auth'; // auth | home | room | game
 
     // ─── Socket setup ──────────────────────────────
@@ -1425,6 +1541,7 @@
         myName = data.name || '';
         chatMessages = [];
         if (data.reconnectToken) sessionStorage.setItem('reconnectToken', data.reconnectToken);
+        if (userProfile) socket.emit('listFriends');
         screen = 'room';
       });
 
@@ -1487,6 +1604,49 @@
         }
       });
 
+      // ─── Friend events ──────────────────────────
+      socket.on('friendsList', (data) => {
+        friendsList = data.friends || [];
+        pendingRequests = data.pending || [];
+        if (screen === 'home') renderHome();
+      });
+
+      socket.on('friendRequestReceived', (from) => {
+        pendingRequests.push(from);
+        if (screen === 'home') renderHome();
+        showInviteToast(`<b>${from.username}</b> sent you a friend request`, [
+          { label: 'Accept', action: `socket.emit('acceptFriendRequest',{fromUserId:${from.id}})` },
+          { label: 'Decline', action: `socket.emit('declineFriendRequest',{fromUserId:${from.id}})` },
+        ]);
+      });
+
+      socket.on('friendRequestAccepted', (friend) => {
+        pendingRequests = pendingRequests.filter(p => p.id !== friend.id);
+        if (!friendsList.find(f => f.id === friend.id)) friendsList.push(friend);
+        if (screen === 'home') renderHome();
+      });
+
+      socket.on('friendRequestSent', () => {
+        const btn = document.querySelector('.btn-friend-sending');
+        if (btn) { btn.textContent = 'Sent!'; btn.disabled = true; }
+      });
+
+      socket.on('friendRemoved', ({ friendId }) => {
+        friendsList = friendsList.filter(f => f.id !== friendId);
+        if (screen === 'home') renderHome();
+      });
+
+      socket.on('friendRequestDeclined', () => {
+        socket.emit('listFriends');
+      });
+
+      socket.on('roomInvite', ({ code, roomName, fromUser }) => {
+        showInviteToast(`<b>${fromUser}</b> invited you to <b>${roomName}</b>`, [
+          { label: 'Join', action: `socket.emit('joinRoom',{code:'${code}'})` },
+          { label: 'Ignore', action: '' },
+        ]);
+      });
+
       socket.on('leftRoom', () => {
         currentRoomCode = null;
         currentRoomState = null;
@@ -1495,7 +1655,7 @@
         mySlot = -1;
         screen = 'home';
         socket.emit('listPublicRooms');
-        if (userProfile) socket.emit('listMyRooms');
+        if (userProfile) { socket.emit('listMyRooms'); socket.emit('listFriends'); }
         renderHome();
       });
 
@@ -1563,6 +1723,7 @@
         setTimeout(() => {
           socket.emit('listMyRooms');
           socket.emit('listPublicRooms');
+          socket.emit('listFriends');
           renderHome();
         }, 200);
       }
@@ -1790,6 +1951,46 @@
                 <div class="my-rooms">${myRoomsHTML}</div>
               </div>
             ` : ''}
+            ${isLoggedIn ? `
+              <div class="home-card friends-card">
+                <h3>Friends ${pendingRequests.length ? `<span class="pending-badge">${pendingRequests.length}</span>` : ''} <button class="btn-refresh" onclick="socket.emit('listFriends')">↻</button></h3>
+                ${pendingRequests.length ? `
+                  <div style="border-bottom:1px solid #334155;padding-bottom:4px;margin-bottom:4px">
+                    ${pendingRequests.map(p => `
+                      <div class="friend-item">
+                        <div class="friend-info">
+                          <span class="friend-avatar">${p.avatar||'😀'}</span>
+                          <div>
+                            <div class="friend-name">${p.username}</div>
+                            <div class="friend-stats">${p.games_won||0}W / ${p.games_played||0}G</div>
+                          </div>
+                        </div>
+                        <div class="friend-actions">
+                          <button class="btn-friend accept" onclick="socket.emit('acceptFriendRequest',{fromUserId:${p.id}})">Accept</button>
+                          <button class="btn-friend decline" onclick="socket.emit('declineFriendRequest',{fromUserId:${p.id}})">✕</button>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : ''}
+                ${friendsList.length ? friendsList.map(f => `
+                  <div class="friend-item">
+                    <div class="friend-info">
+                      <div class="${f.online ? 'friend-online' : 'friend-offline'}"></div>
+                      <span class="friend-avatar">${f.avatar||'😀'}</span>
+                      <div>
+                        <div class="friend-name">${f.username}</div>
+                        <div class="friend-stats">${f.games_won||0}W / ${f.games_played||0}G</div>
+                      </div>
+                    </div>
+                    <div class="friend-actions">
+                      ${currentRoomCode ? `<button class="btn-friend invite" onclick="socket.emit('inviteFriendToRoom',{friendId:${f.id},roomCode:'${currentRoomCode}'})">Invite</button>` : ''}
+                      <button class="btn-friend remove" onclick="if(confirm('Remove friend?'))socket.emit('removeFriend',{friendId:${f.id}})">✕</button>
+                    </div>
+                  </div>
+                `).join('') : '<div class="no-rooms">No friends yet. Add friends from the game over screen!</div>'}
+              </div>
+            ` : ''}
           </div>
         </div>`;
     }
@@ -1921,8 +2122,25 @@
           ${scheduleHTML}
           ${adminHTML}
           ${isRoomOwner && !isCountdown ? `<button class="btn-delete-room" onclick="doDeleteRoom('${state.code}')">Delete Room</button>` : ''}
+          ${hasJoined && userProfile && friendsList.length ? `
+            <div class="lobby-chat" style="margin-bottom:0;border-bottom:none;border-radius:10px 10px 0 0">
+              <h4>Invite Friends</h4>
+              <div style="max-height:100px;overflow-y:auto">
+                ${friendsList.map(f => `
+                  <div class="friend-item" style="padding:4px 12px">
+                    <div class="friend-info">
+                      <div class="${f.online ? 'friend-online' : 'friend-offline'}"></div>
+                      <span class="friend-avatar" style="font-size:1rem">${f.avatar||'😀'}</span>
+                      <span class="friend-name" style="font-size:0.8rem">${f.username}</span>
+                    </div>
+                    <button class="btn-friend invite" onclick="this.textContent='Sent!';this.disabled=true;socket.emit('inviteFriendToRoom',{friendId:${f.id},roomCode:'${state.code}'})">Invite</button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
           ${hasJoined ? `
-            <div class="lobby-chat">
+            <div class="lobby-chat" ${userProfile && friendsList.length ? 'style="margin-top:0;border-radius:0 0 10px 10px;border-top:1px solid #1e293b"' : ''}>
               <h4>Chat</h4>
               <div class="chat-messages" id="chatMessages">${chatMessages.map(m => `<div class="chat-msg"><span class="chat-name">${m.name}:</span>${m.text}</div>`).join('')}</div>
               <div class="chat-input-row">
@@ -1943,6 +2161,18 @@
     function doLeaveRoom() {
       socket.emit('leaveRoom');
       if (window.history.replaceState) window.history.replaceState({}, '', location.pathname);
+    }
+
+    function showInviteToast(message, actions) {
+      let existing = document.querySelector('.invite-toast');
+      if (existing) existing.remove();
+      const toast = document.createElement('div');
+      toast.className = 'invite-toast';
+      toast.innerHTML = `<p>${message}</p><div class="toast-actions">${actions.map(a =>
+        `<button class="btn-friend ${a.label==='Accept'||a.label==='Join'?'accept':'decline'}" onclick="${a.action};this.closest('.invite-toast').remove()">${a.label}</button>`
+      ).join('')}</div>`;
+      document.body.appendChild(toast);
+      setTimeout(() => { if (toast.parentNode) toast.remove(); }, 15000);
     }
 
     function doDeleteRoom(code) {
@@ -2021,12 +2251,33 @@
       const winnerName = winner === 'team1' ? `Team Blue (${n[0]||'P1'} & ${n[3]||'P4'})` : `Team Gold (${n[1]||'P2'} & ${n[2]||'P3'})`;
       const winnerClass = winner === 'team1' ? 'winner-team1' : 'winner-team2';
       if (userProfile) apiGet('/me').then(d => { if(d.profile){userProfile=d.profile;updateProfileBar();} });
+
+      const teamSlots = { team1: [0, 3], team2: [1, 2] };
+      const teamClasses = ['t1', 't2', 't2', 't1'];
+      const profs = state.slotProfiles || [null, null, null, null];
+      const playersHTML = [0, 1, 2, 3].map(i => {
+        const prof = profs[i];
+        const pName = n[i] || `P${i+1}`;
+        const isWinner = teamSlots[winner].includes(i);
+        const isMe = i === mySlot;
+        const canAddFriend = userProfile && prof && prof.userId && prof.userId !== userProfile.id
+          && !friendsList.find(f => f.id === prof.userId)
+          && !pendingRequests.find(p => p.id === prof.userId);
+        return `<div class="gameover-player ${isWinner ? 'winner' : ''}" style="${isWinner ? 'border:1px solid '+(winner==='team1'?'#60a5fa':'#fbbf24') : 'border:1px solid #334155'}">
+          <div class="gp-avatar">${prof?.avatar || '😀'}</div>
+          <div class="gp-name">${pName}${isMe ? ' (You)' : ''}</div>
+          <div class="gp-stats">${prof?.stats?.games_won||0}W / ${prof?.stats?.games_played||0}G</div>
+          <div class="gp-team ${teamClasses[i]}">${teamClasses[i]==='t1'?'Blue':'Gold'}</div>
+          ${canAddFriend ? `<button class="btn-friend btn-friend-sending" style="margin-top:6px" onclick="this.textContent='Sending...';socket.emit('sendFriendRequest',{targetUserId:${prof.userId}})">Add Friend</button>` : ''}
+        </div>`;
+      }).join('');
+
       app.innerHTML = `
         <div class="waiting-screen">
           <div class="game-over">
             <h1 class="${winnerClass}">${winnerName} Wins!</h1>
             <div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div>
-            <p style="color:#94a3b8;margin-bottom:8px;">Team Blue (${n[0]||'P1'} & ${n[3]||'P4'}) vs Team Gold (${n[1]||'P2'} & ${n[2]||'P3'})</p>
+            <div class="gameover-players">${playersHTML}</div>
             <button class="btn-reset" onclick="socket.emit('resetGame')">Play Again</button>
             <button class="btn-back" style="margin-top:8px" onclick="doLeaveRoom()">← Back to Home</button>
           </div>

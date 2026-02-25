@@ -29,6 +29,15 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS friendships (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    friend_id INTEGER NOT NULL REFERENCES users(id),
+    status TEXT DEFAULT 'pending',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, friend_id)
+  );
+
   CREATE TABLE IF NOT EXISTS rooms (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT UNIQUE NOT NULL,
@@ -95,6 +104,34 @@ const stmts = {
   `),
   getProfile: db.prepare(`
     SELECT id, username, email, avatar, totp_enabled, games_played, games_won FROM users WHERE id = ?
+  `),
+
+  // Friendships
+  sendFriendRequest: db.prepare(`
+    INSERT OR IGNORE INTO friendships (user_id, friend_id, status) VALUES (?, ?, 'pending')
+  `),
+  acceptFriendRequest: db.prepare(`
+    UPDATE friendships SET status = 'accepted' WHERE user_id = ? AND friend_id = ? AND status = 'pending'
+  `),
+  removeFriendship: db.prepare(`
+    DELETE FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+  `),
+  getFriends: db.prepare(`
+    SELECT u.id, u.username, u.avatar, u.games_played, u.games_won, f.status,
+      CASE WHEN f.user_id = ? THEN 'sent' ELSE 'received' END as direction
+    FROM friendships f
+    JOIN users u ON u.id = CASE WHEN f.user_id = ? THEN f.friend_id ELSE f.user_id END
+    WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted'
+  `),
+  getPendingRequests: db.prepare(`
+    SELECT u.id, u.username, u.avatar, u.games_played, u.games_won
+    FROM friendships f
+    JOIN users u ON u.id = f.user_id
+    WHERE f.friend_id = ? AND f.status = 'pending'
+  `),
+  checkFriendship: db.prepare(`
+    SELECT * FROM friendships WHERE
+      ((user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?))
   `),
 };
 

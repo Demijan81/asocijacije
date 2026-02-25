@@ -618,11 +618,19 @@ function resolveUser(socket) {
 
 // Track which room each socket is in
 const socketRooms = new Map(); // socketId -> roomCode
+// Track which socket(s) belong to each userId (for real-time notifications)
+const userSockets = new Map(); // userId -> Set<socketId>
 
 // ─── Socket connection ─────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`Connected: ${socket.id}`);
   const authUser = resolveUser(socket);
+
+  // Track authenticated user's socket for friend notifications
+  if (authUser) {
+    if (!userSockets.has(authUser.id)) userSockets.set(authUser.id, new Set());
+    userSockets.get(authUser.id).add(socket.id);
+  }
 
   // Create a new room
   socket.on('createRoom', ({ name, scheduledStart } = {}) => {
@@ -800,6 +808,71 @@ io.on('connection', (socket) => {
     room.emitToRoom('chatMessage', { name: player.name, text, timestamp: Date.now() });
   });
 
+  // ─── Friend system ──────────────────────────────
+  function emitToUser(userId, event, data) {
+    const socks = userSockets.get(userId);
+    if (socks) for (const sid of socks) io.to(sid).emit(event, data);
+  }
+
+  socket.on('sendFriendRequest', ({ targetUserId } = {}) => {
+    if (!authUser || !targetUserId || targetUserId === authUser.id) return;
+    const target = stmts.getProfile.get(targetUserId);
+    if (!target) return;
+    const existing = stmts.checkFriendship.get(authUser.id, targetUserId, targetUserId, authUser.id);
+    if (existing) {
+      if (existing.status === 'accepted') { socket.emit('error', { message: 'Already friends' }); return; }
+      if (existing.user_id === authUser.id) { socket.emit('error', { message: 'Request already sent' }); return; }
+      // They sent us a request — auto-accept
+      stmts.acceptFriendRequest.run(targetUserId, authUser.id);
+      socket.emit('friendRequestAccepted', { id: targetUserId, username: target.username, avatar: target.avatar, games_played: target.games_played, games_won: target.games_won });
+      emitToUser(targetUserId, 'friendRequestAccepted', { id: authUser.id, username: authUser.username, avatar: authUser.avatar, games_played: authUser.games_played, games_won: authUser.games_won });
+      return;
+    }
+    stmts.sendFriendRequest.run(authUser.id, targetUserId);
+    socket.emit('friendRequestSent', { targetUserId });
+    emitToUser(targetUserId, 'friendRequestReceived', { id: authUser.id, username: authUser.username, avatar: authUser.avatar, games_played: authUser.games_played, games_won: authUser.games_won });
+  });
+
+  socket.on('acceptFriendRequest', ({ fromUserId } = {}) => {
+    if (!authUser || !fromUserId) return;
+    const result = stmts.acceptFriendRequest.run(fromUserId, authUser.id);
+    if (result.changes > 0) {
+      const from = stmts.getProfile.get(fromUserId);
+      socket.emit('friendRequestAccepted', { id: fromUserId, username: from?.username, avatar: from?.avatar, games_played: from?.games_played, games_won: from?.games_won });
+      emitToUser(fromUserId, 'friendRequestAccepted', { id: authUser.id, username: authUser.username, avatar: authUser.avatar, games_played: authUser.games_played, games_won: authUser.games_won });
+    }
+  });
+
+  socket.on('declineFriendRequest', ({ fromUserId } = {}) => {
+    if (!authUser || !fromUserId) return;
+    stmts.removeFriendship.run(fromUserId, authUser.id, authUser.id, fromUserId);
+    socket.emit('friendRequestDeclined', { fromUserId });
+  });
+
+  socket.on('removeFriend', ({ friendId } = {}) => {
+    if (!authUser || !friendId) return;
+    stmts.removeFriendship.run(authUser.id, friendId, friendId, authUser.id);
+    socket.emit('friendRemoved', { friendId });
+    emitToUser(friendId, 'friendRemoved', { friendId: authUser.id });
+  });
+
+  socket.on('listFriends', () => {
+    if (!authUser) { socket.emit('friendsList', { friends: [], pending: [] }); return; }
+    const friends = stmts.getFriends.all(authUser.id, authUser.id, authUser.id, authUser.id);
+    const pending = stmts.getPendingRequests.all(authUser.id);
+    // Add online status
+    friends.forEach(f => { f.online = userSockets.has(f.id); });
+    pending.forEach(p => { p.online = userSockets.has(p.id); });
+    socket.emit('friendsList', { friends, pending });
+  });
+
+  socket.on('inviteFriendToRoom', ({ friendId, roomCode } = {}) => {
+    if (!authUser || !friendId || !roomCode) return;
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    emitToUser(friendId, 'roomInvite', { code: roomCode, roomName: room.name, fromUser: authUser.username });
+  });
+
   // Room-scoped events
   socket.on('joinSlot', ({ slot, name }) => {
     const room = rooms.get(socketRooms.get(socket.id));
@@ -899,6 +972,11 @@ io.on('connection', (socket) => {
       if (room) room.handleDisconnect(socket.id);
     }
     socketRooms.delete(socket.id);
+    // Clean up user socket tracking
+    if (authUser) {
+      const socks = userSockets.get(authUser.id);
+      if (socks) { socks.delete(socket.id); if (socks.size === 0) userSockets.delete(authUser.id); }
+    }
   });
 });
 
