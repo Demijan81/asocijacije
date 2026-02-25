@@ -782,6 +782,21 @@ io.on('connection', (socket) => {
     socket.emit('leftRoom');
   });
 
+  // Lobby chat
+  socket.on('sendChat', ({ message } = {}) => {
+    const code = socketRooms.get(socket.id);
+    if (!code || !message) return;
+    const room = rooms.get(code);
+    if (!room) return;
+    const player = room.players[socket.id];
+    if (!player) return;
+    // Only allow chat in lobby/countdown phases
+    if (room.phase !== 'lobby' && room.phase !== 'waiting' && room.phase !== 'countdown') return;
+    const text = String(message).trim().substring(0, 200);
+    if (!text) return;
+    room.emitToRoom('chatMessage', { name: player.name, text, timestamp: Date.now() });
+  });
+
   // Room-scoped events
   socket.on('joinSlot', ({ slot, name }) => {
     const room = rooms.get(socketRooms.get(socket.id));
