@@ -53,6 +53,7 @@ class Room {
     this.createdBy = createdBy; // userId
     this.scheduledStart = null; // ISO string
     this.scheduleTimer = null;
+    this.winScore = 10; // points needed to win
 
     // Game state
     this.players = {}; // socketId -> { slot, name, userId, avatar, stats }
@@ -93,6 +94,7 @@ class Room {
       scheduledStart: this.scheduledStart,
       phase: this.phase,
       countdownLeft: this.countdownLeft,
+      winScore: this.winScore,
       slots: this.slots.map((s, idx) => {
         if (!s && !this.slotDisconnected[idx] && !this.slotReserved[idx]) return null;
         return { slot: idx, name: this.getSlotName(idx), connected: !!s && !this.slotDisconnected[idx], disconnected: this.slotDisconnected[idx] };
@@ -120,6 +122,7 @@ class Room {
         roomName: this.name,
         phase: this.phase,
         scores: this.scores,
+        winScore: this.winScore,
         slots: this.slots.map((s, idx) => (s || this.slotDisconnected[idx]) ? { slot: idx, name: this.getSlotName(idx), connected: !!s && !this.slotDisconnected[idx], disconnected: this.slotDisconnected[idx] } : null),
         slotNames: this.slotNames,
         slotProfiles: this.slotProfiles,
@@ -205,7 +208,7 @@ class Room {
     const { team1, team2 } = this.scores;
     const maxScore = Math.max(team1, team2);
     const diff = Math.abs(team1 - team2);
-    if (maxScore >= 10 && diff >= 2) {
+    if (maxScore >= this.winScore && diff >= 2) {
       this.phase = 'gameOver';
       this.clearTimer();
 
@@ -819,6 +822,16 @@ io.on('connection', (socket) => {
       }
       room.broadcastLobby();
     }
+  });
+
+  socket.on('setWinScore', ({ winScore } = {}) => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (!room || !authUser || room.createdBy !== authUser.id) return;
+    if (room.phase !== 'lobby' && room.phase !== 'waiting' && room.phase !== 'countdown') return;
+    const score = parseInt(winScore);
+    if (!score || score < 1 || score > 50) return;
+    room.winScore = score;
+    room.broadcastLobby();
   });
 
   socket.on('setSchedule', ({ scheduledStart }) => {

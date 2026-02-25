@@ -1852,7 +1852,14 @@
       let scheduleHTML = '';
       if (isRoomOwner && !isCountdown) {
         const curVal = state.scheduledStart ? new Date(state.scheduledStart).toISOString().slice(0,16) : '';
+        const ws = state.winScore || 10;
         scheduleHTML = `
+          <div class="schedule-row">
+            <label style="color:#94a3b8;font-size:0.85rem;white-space:nowrap">Points to win:</label>
+            <select id="winScoreSelect" onchange="doSetWinScore()" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:0.9rem">
+              ${[3,5,7,10,15,20].map(v => `<option value="${v}" ${v===ws?'selected':''}>${v}</option>`).join('')}
+            </select>
+          </div>
           <div class="schedule-row">
             <label style="color:#94a3b8;font-size:0.85rem;white-space:nowrap">Schedule start:</label>
             <input type="datetime-local" id="scheduleInput" value="${curVal}" onchange="doSetSchedule()">
@@ -1866,7 +1873,7 @@
         <div class="waiting-screen">
           <button class="btn-back" onclick="doLeaveRoom()">← Back to Home</button>
           <h1>${state.name || 'Asocijacije'}</h1>
-          <p class="subtitle">${isCountdown ? 'Get ready!' : `Room Lobby (${slots.filter(s=>s).length}/4)`}</p>
+          <p class="subtitle">${isCountdown ? 'Get ready!' : `Room Lobby (${slots.filter(s=>s).length}/4)`} &middot; First to ${state.winScore || 10}</p>
           <div class="invite-section">
             <div class="invite-label">Invite Code</div>
             <div class="invite-code">${state.code}</div>
@@ -1951,6 +1958,11 @@
       socket.emit('sendChat', { message });
       input.value = '';
       input.focus();
+    }
+
+    function doSetWinScore() {
+      const val = document.getElementById('winScoreSelect')?.value;
+      if (val) socket.emit('setWinScore', { winScore: parseInt(val) });
     }
 
     function doSetSchedule() {
@@ -2048,7 +2060,7 @@
         return `<div class="player-corner ${position}"><div class="player-card ${teamClass} ${isEmpty&&!isDisconnected?'empty':''} ${isMe?'is-me':''} ${isActive?'active':''} ${isDisconnected?'disconnected':''}" data-slot="${slot}">${prof?`<div class="player-avatar">${prof.avatar||'😀'}</div>`:''}<div class="player-name">${getDisplayName(slot,state)}${isMe?' (You)':''}</div>${statsHTML}${isDisconnected?'<div class="disconnected-badge">Disconnected</div>':''}<div class="player-role ${roleHighlight?'highlight':''}">${role}</div></div></div>`;
       }
 
-      let centerHTML = `<div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div>`;
+      let centerHTML = `<div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div><div style="color:#64748b;font-size:0.75rem;margin-top:-4px">First to ${state.winScore || 10}</div>`;
 
       if (state.secretWord) centerHTML += `<div class="secret-word-display">Secret: ${state.secretWord}</div>`;
 
