@@ -1679,6 +1679,10 @@
         ]);
       });
 
+      socket.on('kicked', (data) => {
+        alert(data?.message || 'You were removed from the room by the admin');
+      });
+
       socket.on('leftRoom', () => {
         currentRoomCode = null;
         currentRoomState = null;
@@ -2137,7 +2141,7 @@
 
       app.innerHTML = `
         <div class="waiting-screen">
-          <button class="btn-back" onclick="doLeaveRoom()">← Back to Home</button>
+          ${!hasJoined ? `<button class="btn-back" onclick="doLeaveRoom()">← Back to Home</button>` : ''}
           <h1>${state.name || 'Asocijacije'}</h1>
           <p class="subtitle">${isCountdown ? 'Get ready!' : `Room Lobby (${slots.filter(s=>s).length}/4)`} &middot; First to ${state.winScore || 10} &middot; ${state.guessTime === 0 ? '∞' : (state.guessTime || 30) + 's'}</p>
           <div class="invite-section">
@@ -2154,7 +2158,8 @@
           ` : ''}
           <div class="slot-grid">
             ${slots.map((s, i) => {
-              const isTaken = s !== null;
+              const isDisc = s?.disconnected || false;
+              const isTaken = s !== null || isDisc;
               const isMe = i === mySlot;
               const canJoin = !isTaken && !hasJoined;
               const displayName = state.slotNames[i] || ('Player '+(i+1));
@@ -2163,22 +2168,30 @@
 
               // Move buttons: admin can move occupied slots to empty ones
               let moveHTML = '';
-              if (isAdmin && isTaken && !isCountdown) {
-                const empties = [0,1,2,3].filter(j => j !== i && !slots[j]);
+              if (isAdmin && isTaken && !isCountdown && !isDisc) {
+                const empties = [0,1,2,3].filter(j => j !== i && !slots[j] && !(slots[j]?.disconnected));
                 if (empties.length) {
                   moveHTML = `<div class="move-arrows">${empties.map(j => `<button class="move-btn" onclick="event.stopPropagation();socket.emit('movePlayer',{fromSlot:${i},toSlot:${j}})">→ Slot ${j+1}</button>`).join('')}</div>`;
                 }
               }
 
+              // Kick button: admin can kick non-admin players in lobby
+              let kickHTML = '';
+              if (isAdmin && isTaken && !isMe && i !== state.adminSlot && !isCountdown) {
+                kickHTML = `<button class="btn-delete-small" style="margin-top:4px" onclick="event.stopPropagation();if(confirm('Kick this player?'))socket.emit('kickPlayer',{slot:${i}})">Kick</button>`;
+              }
+
               return `
-              <div class="slot-btn ${isTaken?'taken':''} ${isMe?'is-me':''} ${canJoin?'available':''}"
+              <div class="slot-btn ${isTaken?'taken':''} ${isMe?'is-me':''} ${canJoin?'available':''} ${isDisc?'disconnected':''}" 
                 ${canJoin ? `onclick="joinSlot(${i})"` : ''}>
                 <div class="team-label ${teamClasses[i]}">${teamLabels[i]}</div>
                 ${isTaken ? `
                   ${prof ? `<div class="slot-avatar">${prof.avatar||'😀'}</div>` : ''}
                   ${displayName}${isSlotAdmin?'<span class="admin-badge">Admin</span>':''} ${isMe?'(You)':''}
+                  ${isDisc ? '<div class="disconnected-badge" style="font-size:0.7rem;color:#f87171;margin-top:2px">Disconnected</div>' : ''}
                   ${prof ? `<div class="slot-stats">${(prof.stats?.games_won||0)}W / ${(prof.stats?.games_played||0)}G</div>` : ''}
                   ${moveHTML}
+                  ${kickHTML}
                 ` : 'Open slot...'}
               </div>`;
             }).join('')}

@@ -555,48 +555,31 @@ class Room {
     if (player.slot >= 0) {
       const slot = player.slot;
       const wasAdmin = slot === this.adminSlot;
-      const isGameActive = this.phase === 'secret' || this.phase === 'clue' || this.phase === 'guess' || this.phase === 'roundOver';
 
-      if (isGameActive) {
-        this.slots[slot] = null;
-        this.slotDisconnected[slot] = true;
-        console.log(`[${this.code}] Slot ${slot} (${player.name}) disconnected - reserved`);
+      // Always keep slotted players reserved — they can reconnect
+      this.slots[slot] = null;
+      this.slotDisconnected[slot] = true;
+      console.log(`[${this.code}] Slot ${slot} (${player.name}) disconnected - reserved`);
 
-        if (wasAdmin) {
-          this.adminSlot = -1;
-          for (let i = 0; i < 4; i++) {
-            if (this.slots[i] !== null && !this.slotDisconnected[i]) { this.adminSlot = i; break; }
-          }
+      if (wasAdmin) {
+        this.adminSlot = -1;
+        for (let i = 0; i < 4; i++) {
+          if (this.slots[i] !== null && !this.slotDisconnected[i]) { this.adminSlot = i; break; }
         }
+      }
 
-        const anyConnected = Object.keys(this.players).filter(s => s !== socketId).length > 0;
-        if (!anyConnected) {
-          this.clearTimer();
-          if (this.disconnectTimer) { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
-          // Keep room alive for reconnect but pause
-        } else {
-          this.checkDisconnectedTurn();
-        }
+      if (this.phase === 'countdown') {
+        this.clearTimer();
+        this.phase = 'lobby';
+        this.countdownLeft = 0;
+      }
+
+      const anyConnected = Object.keys(this.players).filter(s => s !== socketId).length > 0;
+      if (!anyConnected) {
+        this.clearTimer();
+        if (this.disconnectTimer) { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
       } else {
-        this.slots[slot] = null;
-        this.slotNames[slot] = '';
-        this.slotProfiles[slot] = null;
-        this.slotDisconnected[slot] = false;
-        this.slotReserved[slot] = null;
-        if (player.userId) {
-          try { stmts.removeParticipant.run(this.code, player.userId); } catch(e) {}
-        }
-        if (this.phase === 'countdown') {
-          this.clearTimer();
-          this.phase = 'lobby';
-          this.countdownLeft = 0;
-        }
-        if (wasAdmin) {
-          this.adminSlot = -1;
-          for (let i = 0; i < 4; i++) {
-            if (this.slots[i] !== null) { this.adminSlot = i; break; }
-          }
-        }
+        this.checkDisconnectedTurn();
       }
     }
 
@@ -621,6 +604,42 @@ class Room {
         }
       }, 300000); // 5 minutes
     }
+  }
+
+  // Admin kicks a player from their slot — fully removes them
+  kickPlayer(adminSocketId, targetSlot) {
+    const admin = this.players[adminSocketId];
+    if (!admin || admin.slot !== this.adminSlot) return false;
+    if (targetSlot < 0 || targetSlot > 3 || targetSlot === this.adminSlot) return false;
+    if (this.phase !== 'lobby' && this.phase !== 'waiting') return false;
+
+    // Get info before clearing
+    const targetSid = this.slots[targetSlot];
+    const reserved = this.slotReserved[targetSlot];
+    const targetUserId = reserved?.userId || (targetSid && this.players[targetSid]?.userId);
+
+    // Clear the slot completely
+    this.slots[targetSlot] = null;
+    this.slotNames[targetSlot] = '';
+    this.slotProfiles[targetSlot] = null;
+    this.slotDisconnected[targetSlot] = false;
+    this.slotReserved[targetSlot] = null;
+
+    // Remove from DB participants
+    if (targetUserId) {
+      try { stmts.removeParticipant.run(this.code, targetUserId); } catch(e) {}
+    }
+
+    // If the kicked player is currently connected, remove them from the room
+    if (targetSid && this.players[targetSid]) {
+      delete this.players[targetSid];
+      io.to(targetSid).emit('kicked', { message: 'You were removed from the room by the admin' });
+      io.to(targetSid).emit('leftRoom');
+      socketRooms.delete(targetSid);
+    }
+
+    console.log(`[${this.code}] Admin kicked slot ${targetSlot}`);
+    return true;
   }
 }
 
@@ -647,6 +666,34 @@ io.on('connection', (socket) => {
   if (authUser) {
     if (!userSockets.has(authUser.id)) userSockets.set(authUser.id, new Set());
     userSockets.get(authUser.id).add(socket.id);
+  }
+
+  // Auto-reconnect: if user has a disconnected slot in any room, rejoin them
+  if (authUser) {
+    const myGames = stmts.getMyGames.all(authUser.id);
+    for (const g of myGames) {
+      const room = rooms.get(g.code);
+      if (!room) continue;
+      for (let i = 0; i < 4; i++) {
+        if (!room.slotDisconnected[i]) continue;
+        const res = room.slotReserved[i];
+        if (res && res.userId === authUser.id) {
+          // Found a disconnected slot — auto-reconnect
+          socketRooms.set(socket.id, room.code);
+          const result = room.tryReconnect(socket.id, authUser, null);
+          if (result) {
+            socket.emit('joinedRoom', { code: room.code, roomName: room.name, ...result });
+            if (room.phase === 'lobby' || room.phase === 'waiting') {
+              room.broadcastLobby();
+            } else {
+              room.broadcastGameState();
+            }
+          }
+          break;
+        }
+      }
+      if (socketRooms.has(socket.id)) break; // already reconnected
+    }
   }
 
   // Create a new room
@@ -816,14 +863,33 @@ io.on('connection', (socket) => {
     }));
   });
 
-  // Leave a room (back to home)
+  // Leave a room (back to home) — only spectators (no slot) can voluntarily leave
   socket.on('leaveRoom', () => {
     const code = socketRooms.get(socket.id);
     if (!code) return;
     const room = rooms.get(code);
-    if (room) room.handleDisconnect(socket.id);
+    if (room) {
+      const player = room.players[socket.id];
+      if (player && player.slot >= 0) {
+        // Player has a slot — they can't voluntarily leave, just disconnect view
+        socket.emit('leftRoom');
+        return;
+      }
+      room.handleDisconnect(socket.id);
+    }
     socketRooms.delete(socket.id);
     socket.emit('leftRoom');
+  });
+
+  // Admin kicks a player from a slot
+  socket.on('kickPlayer', ({ slot } = {}) => {
+    const code = socketRooms.get(socket.id);
+    if (!code) return;
+    const room = rooms.get(code);
+    if (!room) return;
+    if (room.kickPlayer(socket.id, slot)) {
+      room.broadcastLobby();
+    }
   });
 
   // Lobby chat
