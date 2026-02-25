@@ -1151,6 +1151,31 @@
     }
     .btn-refresh:hover { color: #e2e8f0; border-color: #60a5fa; }
 
+    .btn-delete-small {
+      background: transparent;
+      border: 1px solid #7f1d1d;
+      color: #f87171;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .btn-delete-small:hover { background: #7f1d1d; color: #fecaca; }
+
+    .btn-delete-room {
+      background: transparent;
+      border: 1px solid #7f1d1d;
+      color: #f87171;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      margin-top: 12px;
+      width: 100%;
+    }
+    .btn-delete-room:hover { background: #7f1d1d; color: #fecaca; }
+
     /* Room lobby (replaces waiting screen) */
     .invite-section {
       background: #0f172a;
@@ -1390,7 +1415,13 @@
         currentState = null;
         mySlot = -1;
         screen = 'home';
+        socket.emit('listPublicRooms');
+        if (userProfile) socket.emit('listMyRooms');
         renderHome();
+      });
+
+      socket.on('roomDeleted', (data) => {
+        // Room was deleted by creator — already handled by leftRoom
       });
 
       socket.on('myRooms', (list) => {
@@ -1619,18 +1650,21 @@
       screen = 'home';
       const app = document.getElementById('app');
       const isLoggedIn = !!userProfile;
-      const myRoomsHTML = myRoomsList.length ? myRoomsList.map(r => `
-        <div class="room-item" onclick="socket.emit('joinRoom',{code:'${r.code}'})">
-          <div>
+      const myRoomsHTML = myRoomsList.length ? myRoomsList.map(r => {
+        const canDelete = r.status === 'lobby' || r.status === 'waiting' || r.status === 'countdown';
+        return `
+        <div class="room-item">
+          <div onclick="socket.emit('joinRoom',{code:'${r.code}'})" style="flex:1;cursor:pointer">
             <span class="room-name">${r.name}</span>
             <span class="room-code">${r.code}</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="room-meta">${r.playerCount} online</span>
             <span class="room-status ${r.status}">${r.status}</span>
+            ${canDelete ? `<button class="btn-delete-small" onclick="event.stopPropagation();doDeleteRoom('${r.code}')" title="Delete room">✕</button>` : ''}
           </div>
-        </div>
-      `).join('') : '<div class="no-rooms">No rooms yet</div>';
+        </div>`;
+      }).join('') : '<div class="no-rooms">No rooms yet</div>';
 
       const publicHTML = publicRoomsList.length ? publicRoomsList.map(r => `
         <div class="room-item" onclick="socket.emit('joinRoom',{code:'${r.code}'})">
@@ -1733,6 +1767,7 @@
               <button class="btn-countdown" onclick="socket.emit('startCountdown', 300)">5 min</button>
             </div>
             ${!allFilled ? '<p style="color:#64748b;font-size:0.85rem">Start Now requires all 4 slots. Use countdown to wait for players.</p>' : ''}
+            ${isRoomOwner ? `<button class="btn-delete-room" onclick="doDeleteRoom('${state.code}')">Delete Room</button>` : ''}
           </div>`;
       }
 
@@ -1807,8 +1842,12 @@
 
     function doLeaveRoom() {
       socket.emit('leaveRoom');
-      // Clean URL
       if (window.history.replaceState) window.history.replaceState({}, '', location.pathname);
+    }
+
+    function doDeleteRoom(code) {
+      if (!confirm('Delete this room? Everyone will be kicked out.')) return;
+      socket.emit('deleteRoom', { code });
     }
 
     function doSetSchedule() {

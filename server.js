@@ -733,6 +733,35 @@ io.on('connection', (socket) => {
     room.broadcastLobby();
   }
 
+  // Delete/cancel a room (creator only, lobby/countdown only)
+  socket.on('deleteRoom', ({ code } = {}) => {
+    if (!code) return;
+    const room = rooms.get(code);
+    if (!room) return;
+    if (!authUser || room.createdBy !== authUser.id) {
+      socket.emit('error', { message: 'Only the room creator can delete this room' });
+      return;
+    }
+    if (room.phase !== 'lobby' && room.phase !== 'waiting' && room.phase !== 'countdown') {
+      socket.emit('error', { message: 'Cannot delete a room while a game is in progress' });
+      return;
+    }
+
+    // Notify all players in the room and kick them out
+    room.clearTimer();
+    if (room.disconnectTimer) clearTimeout(room.disconnectTimer);
+    if (room.scheduleTimer) clearTimeout(room.scheduleTimer);
+    for (const sid of Object.keys(room.players)) {
+      io.to(sid).emit('roomDeleted', { code, message: 'Room was deleted by the creator' });
+      io.to(sid).emit('leftRoom');
+      socketRooms.delete(sid);
+    }
+
+    rooms.delete(code);
+    try { stmts.deleteRoom.run(code); } catch (e) {}
+    console.log(`[${code}] Room deleted by creator`);
+  });
+
   // Leave a room (back to home)
   socket.on('leaveRoom', () => {
     const code = socketRooms.get(socket.id);
