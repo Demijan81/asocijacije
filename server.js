@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -702,10 +703,10 @@ class Room {
     }
   }
 
-  // Admin kicks a player from their slot — fully removes them
+  // Room owner kicks a player from their slot — fully removes them
   kickPlayer(adminSocketId, targetSlot) {
     const admin = this.players[adminSocketId];
-    if (!admin || admin.slot !== this.adminSlot) return false;
+    if (!admin || admin.userId !== this.createdBy) return false;
     if (targetSlot < 0 || targetSlot > 3 || targetSlot === this.adminSlot) return false;
     if (this.phase !== 'lobby' && this.phase !== 'waiting') return false;
 

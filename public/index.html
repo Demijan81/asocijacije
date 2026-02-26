@@ -2241,9 +2241,9 @@
                 }
               }
 
-              // Kick button: admin can kick non-admin players in lobby
+              // Kick button: room owner can kick non-admin players in lobby
               let kickHTML = '';
-              if (isAdmin && isTaken && !isMe && i !== state.adminSlot && !isCountdown) {
+              if (isRoomOwner && isTaken && !isMe && i !== state.adminSlot && !isCountdown) {
                 kickHTML = `<button class="btn-delete-small" style="margin-top:4px" onclick="event.stopPropagation();if(confirm('Kick this player?'))socket.emit('kickPlayer',{slot:${i}})">Kick</button>`;
               }
 
