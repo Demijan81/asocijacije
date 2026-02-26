@@ -2145,7 +2145,7 @@
 
       app.innerHTML = `
         <div class="waiting-screen">
-          ${!hasJoined ? `<button class="btn-back" onclick="doLeaveRoom()">← Back to Home</button>` : ''}
+          ${!hasJoined ? `<button class="btn-back" onclick="doLeaveRoom()">← Back to Home</button>` : `<button class="btn-back" onclick="doReturnToGame()">← Return to Game</button>`}
           <h1>${state.name || 'Asocijacije'}</h1>
           <p class="subtitle">${isCountdown ? 'Get ready!' : `Room Lobby (${slots.filter(s=>s).length}/4)`} &middot; First to ${state.winScore || 10} &middot; ${state.guessTime === 0 ? '∞' : (state.guessTime || 30) + 's'}</p>
           <div class="invite-section">
@@ -2244,6 +2244,11 @@
     function doLeaveRoom() {
       socket.emit('leaveRoom');
       if (window.history.replaceState) window.history.replaceState({}, '', location.pathname);
+    }
+
+    function doReturnToGame() {
+      // Re-join the current room to get latest game state
+      if (currentRoomCode) socket.emit('joinRoom', { code: currentRoomCode });
     }
 
     function showInviteToast(message, actions) {

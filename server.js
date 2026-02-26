@@ -817,7 +817,19 @@ io.on('connection', (socket) => {
 
     socketRooms.set(sock.id, room.code);
 
-    // Try reconnect
+    // Already in this room with a slot? Just re-emit state
+    const existing = room.players[sock.id];
+    if (existing && existing.slot >= 0) {
+      sock.emit('joinedRoom', { code: room.code, roomName: room.name, slot: existing.slot, name: existing.name });
+      if (room.phase === 'lobby' || room.phase === 'waiting') {
+        room.broadcastLobby();
+      } else {
+        room.broadcastGameState();
+      }
+      return;
+    }
+
+    // Try reconnect (disconnected slot)
     const reconnectResult = room.tryReconnect(sock.id, user, rToken);
     if (reconnectResult) {
       sock.emit('joinedRoom', { code: room.code, roomName: room.name, ...reconnectResult });
@@ -829,7 +841,29 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Normal join
+    // Check if user has a reserved slot (connected via different socket, e.g. another tab)
+    if (user) {
+      for (let i = 0; i < 4; i++) {
+        const res = room.slotReserved[i];
+        if (res && res.userId === user.id && !room.slotDisconnected[i] && room.slots[i]) {
+          // User has a connected slot on another socket — take it over
+          const oldSid = room.slots[i];
+          if (oldSid && room.players[oldSid]) delete room.players[oldSid];
+          room.slots[i] = sock.id;
+          room.players[sock.id] = { slot: i, name: res.name, userId: user.id, avatar: user.avatar, stats: { games_played: user.games_played, games_won: user.games_won } };
+          if (user) room.slotProfiles[i] = { userId: user.id, avatar: user.avatar, stats: { games_played: user.games_played, games_won: user.games_won } };
+          sock.emit('joinedRoom', { code: room.code, roomName: room.name, slot: i, name: res.name });
+          if (room.phase === 'lobby' || room.phase === 'waiting') {
+            room.broadcastLobby();
+          } else {
+            room.broadcastGameState();
+          }
+          return;
+        }
+      }
+    }
+
+    // Normal join as spectator
     room.addPlayer(sock.id, user);
     sock.emit('joinedRoom', { code: room.code, roomName: room.name, slot: -1, name: 'Spectator' });
     room.broadcastLobby();
