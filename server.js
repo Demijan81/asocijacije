@@ -132,6 +132,7 @@ class Room {
       const state = {
         roomCode: this.code,
         roomName: this.name,
+        createdBy: this.createdBy,
         phase: this.phase,
         scores: this.scores,
         winScore: this.winScore,
@@ -164,6 +165,7 @@ class Room {
         io.to(sid).emit('state', {
           roomCode: this.code,
           roomName: this.name,
+          createdBy: this.createdBy,
           phase: this.phase,
           scores: this.scores,
           slots: this.slots.map((s, idx) => (s || this.slotDisconnected[idx]) ? { slot: idx, name: this.getSlotName(idx), connected: !!s && !this.slotDisconnected[idx], disconnected: this.slotDisconnected[idx] } : null),
@@ -833,7 +835,7 @@ io.on('connection', (socket) => {
     room.broadcastLobby();
   }
 
-  // Delete/cancel a room (creator only, lobby/countdown only)
+  // Delete/cancel a room (creator only, any phase)
   socket.on('deleteRoom', ({ code } = {}) => {
     if (!code || !authUser) return;
 
@@ -842,10 +844,6 @@ io.on('connection', (socket) => {
       // Room is live in memory
       if (room.createdBy !== authUser.id) {
         socket.emit('error', { message: 'Only the room creator can delete this room' });
-        return;
-      }
-      if (room.phase !== 'lobby' && room.phase !== 'waiting' && room.phase !== 'countdown') {
-        socket.emit('error', { message: 'Cannot delete a room while a game is in progress' });
         return;
       }
 
@@ -881,8 +879,7 @@ io.on('connection', (socket) => {
     if (room) {
       const player = room.players[socket.id];
       if (player && player.slot >= 0) {
-        // Player has a slot — they can't voluntarily leave, just disconnect view
-        socket.emit('leftRoom');
+        // Player has a slot — they cannot leave. Ignore the request.
         return;
       }
       room.handleDisconnect(socket.id);

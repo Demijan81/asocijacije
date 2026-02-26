@@ -2203,7 +2203,7 @@
           ${countdownHTML}
           ${scheduleHTML}
           ${adminHTML}
-          ${isRoomOwner && !isCountdown ? `<button class="btn-delete-room" onclick="doDeleteRoom('${state.code}')">Delete Room</button>` : ''}
+          ${isRoomOwner ? `<button class="btn-delete-room" onclick="doDeleteRoom('${state.code}')">Delete Room</button>` : ''}
           ${hasJoined && userProfile && friendsList.length ? `
             <div class="lobby-chat" style="margin-bottom:0;border-bottom:none;border-radius:10px 10px 0 0">
               <h4>Invite Friends</h4>
@@ -2360,6 +2360,7 @@
         </div>`;
       }).join('');
 
+      const isGOOwner = userProfile && state.createdBy === userProfile.id;
       app.innerHTML = `
         <div class="waiting-screen">
           <div class="game-over">
@@ -2367,6 +2368,7 @@
             <div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div>
             <div class="gameover-players">${playersHTML}</div>
             <button class="btn-reset" onclick="socket.emit('resetGame')">Play Again</button>
+            ${isGOOwner ? `<button class="btn-delete-room" style="margin-top:8px" onclick="doDeleteRoom('${state.roomCode}')">Delete Room</button>` : ''}
           </div>
         </div>`;
     }
@@ -2398,8 +2400,11 @@
         return `<div class="player-corner ${position}"><div class="player-card ${teamClass} ${isEmpty&&!isDisconnected?'empty':''} ${isMe?'is-me':''} ${isActive?'active':''} ${isDisconnected?'disconnected':''}" data-slot="${slot}">${prof?`<div class="player-avatar">${prof.avatar||'😀'}</div>`:''}<div class="player-name">${getDisplayName(slot,state)}${isMe?' (You)':''}</div>${statsHTML}${isDisconnected?'<div class="disconnected-badge">Disconnected</div>':''}<div class="player-role ${roleHighlight?'highlight':''}">${role}</div></div></div>`;
       }
 
+      const isRoomOwner = userProfile && state.createdBy === userProfile.id;
       const timerLabel = state.guessTime === 0 ? '∞' : (state.guessTime || 30) + 's';
-      let centerHTML = `<div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div><div style="color:#64748b;font-size:0.75rem;margin-top:-4px">First to ${state.winScore || 10} · ${timerLabel}</div>`;
+      let centerHTML = '';
+      if (isRoomOwner) centerHTML += `<button class="btn-delete-room" style="position:absolute;top:4px;right:8px;font-size:0.7rem;padding:4px 8px" onclick="doDeleteRoom('${state.roomCode}')">Delete Game</button>`;
+      centerHTML += `<div class="scoreboard"><span class="score team1">${state.scores.team1}</span><span class="score-divider">:</span><span class="score team2">${state.scores.team2}</span></div><div style="color:#64748b;font-size:0.75rem;margin-top:-4px">First to ${state.winScore || 10} · ${timerLabel}</div>`;
 
       if (state.secretWord) centerHTML += `<div class="secret-word-display">Secret: ${state.secretWord}</div>`;
 
