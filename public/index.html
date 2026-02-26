@@ -1600,21 +1600,42 @@
       });
 
       socket.on('state', (state) => {
-        const prevPhase = currentState?.phase;
+        const prev = currentState;
         currentState = state;
         mySlot = state.mySlot;
         screen = 'game';
 
+        // Check if user is actively typing in a game input
         const activeEl = document.activeElement;
-        const isTyping = activeEl && activeEl.tagName === 'INPUT';
-        const inputId = activeEl?.id;
-        const isGameInput = inputId === 'secretInput' || inputId === 'clueInput' || inputId === 'guessInput';
-        if (isTyping && isGameInput && prevPhase === state.phase) {
+        const gameInput = document.getElementById('secretInput') || document.getElementById('clueInput') || document.getElementById('guessInput');
+        const isTyping = gameInput && (gameInput === activeEl || gameInput.value.length > 0);
+
+        // Detect if anything meaningful changed that requires a full re-render
+        const ct = state.currentTurn;
+        const pct = prev?.currentTurn;
+        const phaseChanged = !prev || prev.phase !== state.phase;
+        const turnChanged = ct?.clueGiver !== pct?.clueGiver || ct?.guesser !== pct?.guesser || ct?.secretHolder !== pct?.secretHolder;
+        const roundChanged = prev?.roundStarter !== state.roundStarter;
+        const mustRender = phaseChanged || turnChanged || roundChanged;
+
+        // If typing and nothing critical changed, do a lightweight update only
+        if (isTyping && !mustRender) {
           updateScoreboard(state);
           updatePlayerCards(state);
           return;
         }
+
+        // Save input value before re-render so we can restore it
+        const savedValue = gameInput?.value || '';
+        const savedInputId = gameInput?.id || '';
+
         renderGameView(state);
+
+        // Restore input value if the same input still exists after re-render (same turn, just a forced re-render)
+        if (savedValue && !mustRender) {
+          const restored = document.getElementById(savedInputId);
+          if (restored) { restored.value = savedValue; restored.focus(); }
+        }
       });
 
       socket.on('tick', (timeLeft) => {
@@ -2491,19 +2512,19 @@
 
       if (phase === 'secret') {
         if (mySlot === ct.secretHolder) {
-          centerHTML += `<p class="status-text">Type the secret word (only ${getDisplayName(ct.receiver, state)} will see it)</p><div class="input-area"><input type="text" id="secretInput" placeholder="Secret word..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitSecret()" onkeypress="if(event.keyCode===13)submitSecret()" enterkeyhint="send"><button onclick="submitSecret()">Set Word</button></div>`;
+          centerHTML += `<p class="status-text">Type the secret word (only ${getDisplayName(ct.receiver, state)} will see it)</p><div class="input-area"><input type="text" id="secretInput" placeholder="Secret word..." inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitSecret()" enterkeyhint="send"><button onclick="submitSecret()">Set Word</button></div>`;
         } else {
           centerHTML += `<p class="status-text">${getDisplayName(ct.secretHolder,state)} is choosing the secret word...</p>`;
         }
       } else if (phase === 'clue') {
         if (mySlot === ct.clueGiver) {
-          centerHTML += `<p class="status-text">Type ONE word as a clue for ${getDisplayName(ct.guesser,state)}</p><div class="input-area"><input type="text" id="clueInput" placeholder="One word clue..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitClue()" onkeypress="if(event.keyCode===13)submitClue()" enterkeyhint="send"><button onclick="submitClue()">Give Clue</button></div>`;
+          centerHTML += `<p class="status-text">Type ONE word as a clue for ${getDisplayName(ct.guesser,state)}</p><div class="input-area"><input type="text" id="clueInput" placeholder="One word clue..." inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitClue()" enterkeyhint="send"><button onclick="submitClue()">Give Clue</button></div>`;
         } else {
           centerHTML += `<p class="status-text">${getDisplayName(ct.clueGiver,state)} is thinking of a clue...</p>`;
         }
       } else if (phase === 'guess') {
         if (mySlot === ct.guesser) {
-          centerHTML += `<p class="status-text">Guess the secret word!</p><div class="input-area"><input type="text" id="guessInput" placeholder="Your guess..." autofocus autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitGuess()" onkeypress="if(event.keyCode===13)submitGuess()" enterkeyhint="send"><button onclick="submitGuess()">Guess</button></div>`;
+          centerHTML += `<p class="status-text">Guess the secret word!</p><div class="input-area"><input type="text" id="guessInput" placeholder="Your guess..." inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')submitGuess()" enterkeyhint="send"><button onclick="submitGuess()">Guess</button></div>`;
         } else {
           centerHTML += `<p class="status-text">${getDisplayName(ct.guesser,state)} is guessing...</p>`;
         }
@@ -2532,7 +2553,7 @@
 
       app.innerHTML = `<div class="game-container">${playerCard(0,'top-left')}${playerCard(1,'top-right')}<div class="center-area">${centerHTML}</div>${playerCard(2,'bottom-left')}${playerCard(3,'bottom-right')}</div>${testHTML}`;
       const input = document.querySelector('.input-area input');
-      if (input) input.focus();
+      if (input && !('ontouchstart' in window)) input.focus();
     }
 
     function doTestAct(slot, action) {
