@@ -114,29 +114,28 @@ function generateCode() {
 }
 
 // Teams: P1(slot0) + P4(slot3) = team1, P2(slot1) + P3(slot2) = team2
-// Two rounds alternate:
-//   Round A (0): P1 secret → P2 sees → P2 clue → P3 guess → miss: P1 clue → P4 guess → repeat
-//   Round B (1): P2 secret → P4 sees → P4 clue → P1 guess → miss: P2 clue → P3 guess → repeat
+// Two rounds alternate. Clue giver rotates through all 4 players starting from receiver.
+// Guesser is always the teammate of the clue giver.
+//   Round A (0): P1 secret → P2 sees → clues: P2,P3,P4,P1,P2...
+//   Round B (1): P2 secret → P4 sees → clues: P4,P1,P2,P3,P4...
 
 function getTeam(slot) {
   return (slot === 0 || slot === 3) ? 'team1' : 'team2';
 }
 
+function getTeammate(slot) {
+  // slot0↔slot3, slot1↔slot2
+  return [3, 2, 1, 0][slot];
+}
+
 function getRoundConfig(roundStarter, turnWithinRound) {
   // roundStarter alternates 0 and 1
-  if (roundStarter === 0) {
-    // Round A: P1(0) secret → P2(1) sees it
-    // T0: P2(1) clue → P3(2) guess | T1: P1(0) clue → P4(3) guess | repeat
-    const clueGiver = (turnWithinRound % 2 === 0) ? 1 : 0;
-    const guesser   = (turnWithinRound % 2 === 0) ? 2 : 3;
-    return { secretHolder: 0, receiver: 1, clueGiver, guesser };
-  } else {
-    // Round B: P2(1) secret → P4(3) sees it
-    // T0: P4(3) clue → P1(0) guess | T1: P2(1) clue → P3(2) guess | repeat
-    const clueGiver = (turnWithinRound % 2 === 0) ? 3 : 1;
-    const guesser   = (turnWithinRound % 2 === 0) ? 0 : 2;
-    return { secretHolder: 1, receiver: 3, clueGiver, guesser };
-  }
+  const secretHolder = roundStarter === 0 ? 0 : 1;
+  const receiver = roundStarter === 0 ? 1 : 3;
+  // Clue giver rotates 1→2→3→4→1... starting from receiver
+  const clueGiver = (receiver + turnWithinRound) % 4;
+  const guesser = getTeammate(clueGiver);
+  return { secretHolder, receiver, clueGiver, guesser };
 }
 
 class Room {

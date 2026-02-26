@@ -1536,6 +1536,7 @@
     let authScreen = 'login';
     let pending2faToken = null;
     let setup2faData = null;
+    let gameInputFocused = false; // track if user has focused a game input (reliable across mobile)
 
     const AVATARS = [
       '😀','😎','🤓','🥳','😈','👻','🤖','👽',
@@ -1605,18 +1606,18 @@
         mySlot = state.mySlot;
         screen = 'game';
 
-        // Check if user is actively typing in a game input
-        const activeEl = document.activeElement;
-        const gameInput = document.getElementById('secretInput') || document.getElementById('clueInput') || document.getElementById('guessInput');
-        const isTyping = gameInput && (gameInput === activeEl || gameInput.value.length > 0);
-
-        // Detect if anything meaningful changed that requires a full re-render
+        // Detect if the turn/phase actually changed
         const ct = state.currentTurn;
         const pct = prev?.currentTurn;
         const phaseChanged = !prev || prev.phase !== state.phase;
         const turnChanged = ct?.clueGiver !== pct?.clueGiver || ct?.guesser !== pct?.guesser || ct?.secretHolder !== pct?.secretHolder;
         const roundChanged = prev?.roundStarter !== state.roundStarter;
         const mustRender = phaseChanged || turnChanged || roundChanged;
+
+        // Use event-based flag + DOM checks for reliable typing detection (works on Chrome Android)
+        const gameInput = document.getElementById('secretInput') || document.getElementById('clueInput') || document.getElementById('guessInput');
+        const hasContent = gameInput && gameInput.value.length > 0;
+        const isTyping = gameInput && (gameInputFocused || hasContent);
 
         // If typing and nothing critical changed, do a lightweight update only
         if (isTyping && !mustRender) {
@@ -1625,17 +1626,10 @@
           return;
         }
 
-        // Save input value before re-render so we can restore it
-        const savedValue = gameInput?.value || '';
-        const savedInputId = gameInput?.id || '';
+        // On turn change, reset typing flag
+        if (mustRender) gameInputFocused = false;
 
         renderGameView(state);
-
-        // Restore input value if the same input still exists after re-render (same turn, just a forced re-render)
-        if (savedValue && !mustRender) {
-          const restored = document.getElementById(savedInputId);
-          if (restored) { restored.value = savedValue; restored.focus(); }
-        }
       });
 
       socket.on('tick', (timeLeft) => {
@@ -2553,7 +2547,11 @@
 
       app.innerHTML = `<div class="game-container">${playerCard(0,'top-left')}${playerCard(1,'top-right')}<div class="center-area">${centerHTML}</div>${playerCard(2,'bottom-left')}${playerCard(3,'bottom-right')}</div>${testHTML}`;
       const input = document.querySelector('.input-area input');
-      if (input && !('ontouchstart' in window)) input.focus();
+      if (input) {
+        input.addEventListener('focus', () => { gameInputFocused = true; });
+        input.addEventListener('blur', () => { setTimeout(() => { gameInputFocused = false; }, 200); });
+        if (!('ontouchstart' in window)) input.focus();
+      }
     }
 
     function doTestAct(slot, action) {
@@ -2561,9 +2559,9 @@
       if (i && i.value.trim()) { socket.emit('testActAs', { slot, action, value: i.value.trim() }); i.value = ''; }
     }
 
-    function submitSecret() { const i=document.getElementById('secretInput'); if(i&&i.value.trim()){socket.emit('submitSecret',i.value.trim());i.value='';} }
-    function submitClue() { const i=document.getElementById('clueInput'); if(i&&i.value.trim()){socket.emit('submitClue',i.value.trim());i.value='';} }
-    function submitGuess() { const i=document.getElementById('guessInput'); if(i&&i.value.trim()){socket.emit('submitGuess',i.value.trim());i.value='';} }
+    function submitSecret() { const i=document.getElementById('secretInput'); if(i&&i.value.trim()){gameInputFocused=false;socket.emit('submitSecret',i.value.trim());i.value='';} }
+    function submitClue() { const i=document.getElementById('clueInput'); if(i&&i.value.trim()){gameInputFocused=false;socket.emit('submitClue',i.value.trim());i.value='';} }
+    function submitGuess() { const i=document.getElementById('guessInput'); if(i&&i.value.trim()){gameInputFocused=false;socket.emit('submitGuess',i.value.trim());i.value='';} }
 
     // ─── Init ──────────────────────────────────────
     tryAutoLogin();
