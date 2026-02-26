@@ -13,6 +13,90 @@ const io = new Server(server);
 
 app.use(cookieParser());
 app.use('/api/auth', authRouter);
+
+// Email verification link handler
+app.get('/verify-email', (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).send(verifyPage('Invalid verification link.', false));
+  const user = stmts.findByEmailToken.get(token);
+  if (!user) return res.status(400).send(verifyPage('Invalid or already used verification link.', false));
+  stmts.verifyEmail.run(token);
+  res.send(verifyPage(`Email verified! Welcome <b>${user.username}</b>. You can now log in and play.`, true));
+});
+
+// Reset password page handler
+app.get('/reset-password', (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).send(resetPage('Invalid reset link.', null));
+  const user = stmts.findByResetToken.get(token);
+  if (!user) return res.status(400).send(resetPage('Invalid or expired reset link.', null));
+  if (new Date(user.reset_expires) < new Date()) return res.status(400).send(resetPage('Reset link has expired. Please request a new one.', null));
+  res.send(resetPage(null, token));
+});
+
+function verifyPage(message, success) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email Verification - Asocijacije</title>
+  <style>body{background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
+  .box{background:#1e293b;border-radius:16px;padding:40px;text-align:center;max-width:400px;width:90%}
+  h1{color:${success?'#34d399':'#f87171'};margin-bottom:16px;font-size:1.5rem}
+  p{color:#94a3b8;line-height:1.6}
+  a{display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;margin-top:20px}
+  a:hover{background:#2563eb}</style></head>
+  <body><div class="box"><h1>${success?'✓ Verified':'✗ Error'}</h1><p>${message}</p><a href="/">Go to Asocijacije</a></div></body></html>`;
+}
+
+function resetPage(error, token) {
+  if (error) {
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reset Password - Asocijacije</title>
+    <style>body{background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
+    .box{background:#1e293b;border-radius:16px;padding:40px;text-align:center;max-width:400px;width:90%}
+    h1{color:#f87171;font-size:1.5rem}p{color:#94a3b8}
+    a{display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;margin-top:20px}
+    a:hover{background:#2563eb}</style></head>
+    <body><div class="box"><h1>✗ Error</h1><p>${error}</p><a href="/">Go to Asocijacije</a></div></body></html>`;
+  }
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reset Password - Asocijacije</title>
+  <style>body{background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
+  .box{background:#1e293b;border-radius:16px;padding:40px;text-align:center;max-width:400px;width:90%}
+  h1{color:#60a5fa;font-size:1.5rem;margin-bottom:16px}
+  label{display:block;color:#94a3b8;font-size:0.85rem;margin-bottom:6px;text-align:left}
+  input{width:100%;padding:10px 14px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;font-size:1rem;margin-bottom:16px;box-sizing:border-box}
+  input:focus{outline:none;border-color:#3b82f6}
+  button{width:100%;background:#3b82f6;color:#fff;border:none;padding:12px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer}
+  button:hover{background:#2563eb}
+  .msg{margin-top:12px;font-size:0.9rem}
+  .msg.ok{color:#34d399}.msg.err{color:#f87171}
+  a{color:#60a5fa;text-decoration:none;display:inline-block;margin-top:16px}
+  </style></head>
+  <body><div class="box"><h1>Reset Password</h1>
+  <form onsubmit="doReset(event)">
+    <label>New Password (min 6 characters)</label>
+    <input type="password" id="pw1" placeholder="New password" minlength="6" required>
+    <label>Confirm Password</label>
+    <input type="password" id="pw2" placeholder="Confirm password" minlength="6" required>
+    <button type="submit">Reset Password</button>
+  </form>
+  <div class="msg" id="msg"></div>
+  <a href="/">Back to Asocijacije</a>
+  </div>
+  <script>
+  async function doReset(e){
+    e.preventDefault();
+    const pw1=document.getElementById('pw1').value;
+    const pw2=document.getElementById('pw2').value;
+    const msg=document.getElementById('msg');
+    if(pw1.length<6){msg.className='msg err';msg.textContent='Password must be at least 6 characters';return;}
+    if(pw1!==pw2){msg.className='msg err';msg.textContent='Passwords do not match';return;}
+    try{
+      const r=await fetch('/api/auth/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:'${token}',password:pw1})});
+      const d=await r.json();
+      if(d.ok){msg.className='msg ok';msg.textContent='Password reset! You can now log in.';document.querySelector('form').style.display='none';}
+      else{msg.className='msg err';msg.textContent=d.error||'Reset failed';}
+    }catch(err){msg.className='msg err';msg.textContent='Network error';}
+  }
+  </script></body></html>`;
+}
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Room Management ──────────────────────────────────

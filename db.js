@@ -58,6 +58,14 @@ db.exec(`
   );
 `);
 
+// Migration: add new columns if they don't exist
+try { db.exec(`ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN email_token TEXT DEFAULT NULL`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN reset_token TEXT DEFAULT NULL`); } catch(e) {}
+try { db.exec(`ALTER TABLE users ADD COLUMN reset_expires TEXT DEFAULT NULL`); } catch(e) {}
+// Auto-verify existing users who registered before email verification was required
+try { db.exec(`UPDATE users SET email_verified = 1 WHERE email_token IS NULL AND email_verified = 0`); } catch(e) {}
+
 // Prepared statements
 const stmts = {
   // Rooms
@@ -81,7 +89,7 @@ const stmts = {
   `),
 
   createUser: db.prepare(`
-    INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)
+    INSERT INTO users (username, email, password_hash, email_token) VALUES (?, ?, ?, ?)
   `),
   findByEmail: db.prepare(`
     SELECT * FROM users WHERE email = ?
@@ -111,7 +119,25 @@ const stmts = {
     UPDATE users SET games_won = games_won + 1, games_played = games_played + 1, updated_at = datetime('now') WHERE id = ?
   `),
   getProfile: db.prepare(`
-    SELECT id, username, email, avatar, totp_enabled, games_played, games_won FROM users WHERE id = ?
+    SELECT id, username, email, avatar, totp_enabled, email_verified, games_played, games_won FROM users WHERE id = ?
+  `),
+  verifyEmail: db.prepare(`
+    UPDATE users SET email_verified = 1, email_token = NULL, updated_at = datetime('now') WHERE email_token = ?
+  `),
+  findByEmailToken: db.prepare(`
+    SELECT * FROM users WHERE email_token = ?
+  `),
+  setResetToken: db.prepare(`
+    UPDATE users SET reset_token = ?, reset_expires = ?, updated_at = datetime('now') WHERE id = ?
+  `),
+  findByResetToken: db.prepare(`
+    SELECT * FROM users WHERE reset_token = ?
+  `),
+  updatePassword: db.prepare(`
+    UPDATE users SET password_hash = ?, reset_token = NULL, reset_expires = NULL, updated_at = datetime('now') WHERE id = ?
+  `),
+  resendEmailToken: db.prepare(`
+    UPDATE users SET email_token = ?, updated_at = datetime('now') WHERE id = ?
   `),
 
   // Friendships

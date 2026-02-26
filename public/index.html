@@ -786,6 +786,17 @@
 
     .guest-link:hover { color: #94a3b8; }
 
+    .forgot-link {
+      color: #60a5fa;
+      cursor: pointer;
+      font-size: 0.85rem;
+      display: block;
+      margin: 8px 0;
+      text-align: center;
+    }
+
+    .forgot-link:hover { text-decoration: underline; }
+
     /* Profile bar (top-left) */
     .profile-bar {
       position: fixed;
@@ -1747,6 +1758,12 @@
       const data = await apiGet('/me');
       if (data.profile) {
         userProfile = data.profile;
+        // Check if email needs verification
+        if (!data.profile.email_verified) {
+          authScreen = 'verifyEmail';
+          renderAuth();
+          return;
+        }
         onLoggedIn(urlRoom);
       } else {
         authToken = null;
@@ -1826,6 +1843,7 @@
               <div class="form-group"><label>Email</label><input type="email" id="authEmail" placeholder="you@example.com"></div>
               <div class="form-group"><label>Password</label><input type="password" id="authPassword" placeholder="Your password" enterkeyhint="go" onkeydown="if(event.key==='Enter')doLogin()" onkeypress="if(event.keyCode===13)doLogin()"></div>
               <button class="btn-primary" onclick="doLogin()">Log In</button>
+              <span class="forgot-link" onclick="authScreen='forgot';renderAuth()">Forgot password?</span>
               <button class="btn-secondary" onclick="authScreen='register';renderAuth()">Create Account</button>
               <div id="authError"></div>
             </div>
@@ -1862,6 +1880,32 @@
             </div>
           </div>`;
         document.getElementById('tfaCode')?.focus();
+      } else if (authScreen === 'forgot') {
+        app.innerHTML = `
+          <div class="auth-screen">
+            <h1>Asocijacije</h1>
+            <div class="auth-box">
+              <h2>Forgot Password</h2>
+              <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:12px;">Enter your email and we'll send a reset link.</p>
+              <div class="form-group"><label>Email</label><input type="email" id="forgotEmail" placeholder="you@example.com" enterkeyhint="go" onkeydown="if(event.key==='Enter')doForgotPassword()" onkeypress="if(event.keyCode===13)doForgotPassword()"></div>
+              <button class="btn-primary" onclick="doForgotPassword()">Send Reset Link</button>
+              <button class="btn-secondary" onclick="authScreen='login';renderAuth()">Back to Login</button>
+              <div id="authError"></div>
+            </div>
+          </div>`;
+        document.getElementById('forgotEmail')?.focus();
+      } else if (authScreen === 'verifyEmail') {
+        app.innerHTML = `
+          <div class="auth-screen">
+            <h1>Asocijacije</h1>
+            <div class="auth-box">
+              <h2>Verify Your Email</h2>
+              <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:12px;">We sent a verification link to <b style="color:#e2e8f0">${userProfile?.email || 'your email'}</b>. Please check your inbox and click the link to verify.</p>
+              <button class="btn-primary" onclick="doResendVerification()">Resend Verification Email</button>
+              <button class="btn-secondary" onclick="doLogout()">Log Out</button>
+              <div id="authError"></div>
+            </div>
+          </div>`;
       }
     }
 
@@ -1872,7 +1916,9 @@
       const data = await api('/login', { email, password });
       if (data.error) return showAuthError(data.error);
       if (data.needs2fa) { pending2faToken = data.partialToken; authScreen = 'verify2fa'; renderAuth(); return; }
-      authToken = data.token; localStorage.setItem('authToken', authToken); userProfile = data.profile; onLoggedIn();
+      authToken = data.token; localStorage.setItem('authToken', authToken); userProfile = data.profile;
+      if (data.needsVerification) { authScreen = 'verifyEmail'; renderAuth(); return; }
+      onLoggedIn();
     }
 
     async function doRegister() {
@@ -1882,7 +1928,23 @@
       if (!username || !email || !password) return showAuthError('Fill in all fields');
       const data = await api('/register', { username, email, password });
       if (data.error) return showAuthError(data.error);
-      authToken = data.token; localStorage.setItem('authToken', authToken); userProfile = data.profile; onLoggedIn();
+      authToken = data.token; localStorage.setItem('authToken', authToken); userProfile = data.profile;
+      if (data.needsVerification) { authScreen = 'verifyEmail'; renderAuth(); return; }
+      onLoggedIn();
+    }
+
+    async function doForgotPassword() {
+      const email = document.getElementById('forgotEmail')?.value?.trim();
+      if (!email) return showAuthError('Enter your email');
+      const data = await api('/forgot-password', { email });
+      if (data.error) return showAuthError(data.error);
+      showAuthError('<span style="color:#34d399">' + (data.message || 'Check your email for a reset link.') + '</span>');
+    }
+
+    async function doResendVerification() {
+      const data = await api('/resend-verification');
+      if (data.error) return showAuthError(data.error);
+      showAuthError('<span style="color:#34d399">' + (data.message || 'Verification email sent!') + '</span>');
     }
 
     async function doVerify2fa() {
