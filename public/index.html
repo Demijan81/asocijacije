@@ -1644,10 +1644,13 @@
     let quizState = null; // { num, question, category, timeLeft, scores, result }
 
     // ─── Socket setup ──────────────────────────────
+    let autoReconnected = false; // flag to prevent duplicate joinRoom after server auto-reconnect
     function connectSocket() {
       if (socket) socket.disconnect();
+      autoReconnected = false;
       const reconnectToken = sessionStorage.getItem('reconnectToken') || null;
-      socket = io({ auth: { token: authToken, reconnectToken } });
+      const savedRoom = sessionStorage.getItem('currentRoomCode') || null;
+      socket = io({ auth: { token: authToken, reconnectToken, savedRoom } });
 
       socket.on('assigned', (data) => {
         mySlot = data.slot;
@@ -1662,8 +1665,10 @@
 
       socket.on('joinedRoom', (data) => {
         currentRoomCode = data.code;
+        sessionStorage.setItem('currentRoomCode', data.code);
         mySlot = data.slot ?? -1;
         myName = data.name || '';
+        if (data.autoReconnect) autoReconnected = true;
         // Don't clear chatMessages here — they persist in lobby
         if (data.reconnectToken) sessionStorage.setItem('reconnectToken', data.reconnectToken);
         if (userProfile) socket.emit('listFriends');
@@ -1822,6 +1827,8 @@
       });
 
       socket.on('kicked', (data) => {
+        sessionStorage.removeItem('currentRoomCode');
+        if (window.history.replaceState) window.history.replaceState({}, '', location.pathname);
         alert(data?.message || 'You were removed from the room by the admin');
       });
 
@@ -1832,6 +1839,8 @@
         chatMessages = [];
         quizState = null;
         mySlot = -1;
+        sessionStorage.removeItem('currentRoomCode');
+        if (window.history.replaceState) window.history.replaceState({}, '', location.pathname);
         screen = 'home';
         socket.emit('listPublicRooms');
         if (userProfile) { socket.emit('listMyRooms'); socket.emit('listFriends'); socket.emit('listMyGames'); }
@@ -1906,18 +1915,20 @@
       myName = userProfile.username;
       updateProfileBar();
       connectSocket();
-      if (autoJoinRoom) {
-        setTimeout(() => socket.emit('joinRoom', { code: autoJoinRoom }), 300);
-      } else {
-        screen = 'home';
-        setTimeout(() => {
+      // Wait briefly for server auto-reconnect to fire first
+      setTimeout(() => {
+        if (autoReconnected) return; // server already reconnected us to a room
+        if (autoJoinRoom) {
+          socket.emit('joinRoom', { code: autoJoinRoom });
+        } else {
+          screen = 'home';
           socket.emit('listMyRooms');
           socket.emit('listPublicRooms');
           socket.emit('listFriends');
           socket.emit('listMyGames');
           renderHome();
-        }, 200);
-      }
+        }
+      }, 500);
     }
 
     function enterAsGuest() {
@@ -1929,11 +1940,16 @@
       screen = 'home';
       const urlParams = new URLSearchParams(window.location.search);
       const urlRoom = urlParams.get('room');
-      if (urlRoom) {
-        setTimeout(() => socket.emit('joinRoom', { code: urlRoom }), 300);
-      } else {
-        setTimeout(() => { socket.emit('listPublicRooms'); renderHome(); }, 200);
-      }
+      // Wait briefly for server auto-reconnect to fire first
+      setTimeout(() => {
+        if (autoReconnected) return; // server already reconnected us
+        if (urlRoom) {
+          socket.emit('joinRoom', { code: urlRoom });
+        } else {
+          socket.emit('listPublicRooms');
+          renderHome();
+        }
+      }, 500);
     }
 
     function updateProfileBar() {

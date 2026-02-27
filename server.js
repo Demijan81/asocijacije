@@ -933,6 +933,10 @@ io.on('connection', (socket) => {
   }
 
   // Auto-reconnect: if user has a disconnected slot in any room, rejoin them
+  const reconnectToken = socket.handshake.auth?.reconnectToken || null;
+  const savedRoom = socket.handshake.auth?.savedRoom || null;
+  let didAutoReconnect = false;
+
   if (authUser) {
     const myGames = stmts.getMyGames.all(authUser.id);
     for (const g of myGames) {
@@ -942,21 +946,39 @@ io.on('connection', (socket) => {
         if (!room.slotDisconnected[i]) continue;
         const res = room.slotReserved[i];
         if (res && res.userId === authUser.id) {
-          // Found a disconnected slot — auto-reconnect
           socketRooms.set(socket.id, room.code);
           const result = room.tryReconnect(socket.id, authUser, null);
           if (result) {
-            socket.emit('joinedRoom', { code: room.code, roomName: room.name, ...result });
+            socket.emit('joinedRoom', { code: room.code, roomName: room.name, autoReconnect: true, ...result });
             if (room.phase === 'lobby' || room.phase === 'waiting') {
               room.broadcastLobby();
             } else {
               room.broadcastGameState();
             }
+            didAutoReconnect = true;
           }
           break;
         }
       }
-      if (socketRooms.has(socket.id)) break; // already reconnected
+      if (didAutoReconnect) break;
+    }
+  }
+
+  // Guest auto-reconnect: use reconnectToken + savedRoom from sessionStorage
+  if (!didAutoReconnect && !authUser && reconnectToken && savedRoom) {
+    const room = rooms.get(savedRoom);
+    if (room) {
+      const result = room.tryReconnect(socket.id, null, reconnectToken);
+      if (result) {
+        socketRooms.set(socket.id, room.code);
+        socket.emit('joinedRoom', { code: room.code, roomName: room.name, autoReconnect: true, ...result });
+        if (room.phase === 'lobby' || room.phase === 'waiting') {
+          room.broadcastLobby();
+        } else {
+          room.broadcastGameState();
+        }
+        didAutoReconnect = true;
+      }
     }
   }
 
