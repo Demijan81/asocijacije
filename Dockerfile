@@ -10,6 +10,7 @@ RUN npm ci --production
 COPY server.js .
 COPY db.js .
 COPY auth.js .
+COPY quiz-questions.js .
 COPY public/ ./public/
 
 RUN mkdir -p /app/data
