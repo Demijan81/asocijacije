@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const { router: authRouter, verifyToken } = require('./auth');
 const { stmts } = require('./db');
 const crypto = require('crypto');
+const quizQuestions = require('./quiz-questions');
 
 const app = express();
 const server = http.createServer(app);
@@ -114,27 +115,31 @@ function generateCode() {
 }
 
 // Teams: P1(slot0) + P4(slot3) = team1, P2(slot1) + P3(slot2) = team2
-// Two rounds alternate. Clue giver rotates through all 4 players starting from receiver.
-// Guesser is always the teammate of the clue giver.
-//   Round A (0): P1 secret → P2 sees → clues: P2,P3,P4,P1,P2...
-//   Round B (1): P2 secret → P4 sees → clues: P4,P1,P2,P3,P4...
+// 4 rounds rotate the secret holder through all players.
+// Each round: receiver = next player clockwise. Clue/guess alternates between two pairs.
+//   Round A (0): P1 secret → P2 sees → (P2 clue, P3 guess) → (P1 clue, P4 guess) → repeat
+//   Round B (1): P2 secret → P3 sees → (P3 clue, P1 guess) → (P2 clue, P4 guess) → repeat
+//   Round C (2): P3 secret → P4 sees → (P4 clue, P2 guess) → (P3 clue, P1 guess) → repeat
+//   Round D (3): P4 secret → P1 sees → (P1 clue, P3 guess) → (P4 clue, P2 guess) → repeat
 
 function getTeam(slot) {
   return (slot === 0 || slot === 3) ? 'team1' : 'team2';
 }
 
-function getTeammate(slot) {
-  // slot0↔slot3, slot1↔slot2
-  return [3, 2, 1, 0][slot];
-}
+// Pre-computed turn tables per round starter [clueGiver, guesser] for even/odd turns
+const ROUND_TURNS = {
+  0: [[1, 2], [0, 3]], // Round A
+  1: [[2, 0], [1, 3]], // Round B
+  2: [[3, 1], [2, 0]], // Round C
+  3: [[0, 2], [3, 1]], // Round D
+};
 
 function getRoundConfig(roundStarter, turnWithinRound) {
-  // roundStarter alternates 0 and 1
-  const secretHolder = roundStarter === 0 ? 0 : 1;
-  const receiver = roundStarter === 0 ? 1 : 3;
-  // Clue giver rotates 1→2→3→4→1... starting from receiver
-  const clueGiver = (receiver + turnWithinRound) % 4;
-  const guesser = getTeammate(clueGiver);
+  const S = roundStarter % 4;
+  const secretHolder = S;
+  const receiver = (S + 1) % 4;
+  const parity = turnWithinRound % 2; // 0 = even, 1 = odd
+  const [clueGiver, guesser] = ROUND_TURNS[S][parity];
   return { secretHolder, receiver, clueGiver, guesser };
 }
 
@@ -167,10 +172,122 @@ class Room {
     this.timeLeft = 0;
     this.countdownLeft = 0;
     this.disconnectTimer = null;
+
+    // Quiz mini-game state
+    this.quiz = null; // { active, scores: {name: pts}, currentQ, usedIndices, timer, timeLeft, questionNum, answeredBy }
   }
 
   getSlotName(slot) {
     return this.slotNames[slot] || `Player ${slot + 1}`;
+  }
+
+  // ─── Quiz mini-game ───────────────────────────
+  startQuiz(adminSocketId) {
+    const admin = this.players[adminSocketId];
+    if (!admin || admin.slot !== this.adminSlot) return false;
+    if (this.phase !== 'lobby' && this.phase !== 'waiting' && this.phase !== 'countdown') return false;
+
+    this.quiz = {
+      active: true,
+      scores: {},       // playerName -> points
+      currentQ: null,    // { q, a, alt, cat }
+      usedIndices: new Set(),
+      timer: null,
+      timeLeft: 0,
+      questionNum: 0,
+      answeredBy: null,  // name of player who answered current question
+    };
+    this.nextQuizQuestion();
+    return true;
+  }
+
+  stopQuiz() {
+    if (!this.quiz) return;
+    if (this.quiz.timer) clearInterval(this.quiz.timer);
+    this.quiz.active = false;
+    this.emitToRoom('quizStopped', { scores: this.quiz.scores });
+    this.quiz = null;
+  }
+
+  nextQuizQuestion() {
+    if (!this.quiz || !this.quiz.active) return;
+    if (this.quiz.timer) clearInterval(this.quiz.timer);
+
+    // Pick a random unused question
+    const available = [];
+    for (let i = 0; i < quizQuestions.length; i++) {
+      if (!this.quiz.usedIndices.has(i)) available.push(i);
+    }
+    if (available.length === 0) {
+      // All questions used, reset pool
+      this.quiz.usedIndices.clear();
+      for (let i = 0; i < quizQuestions.length; i++) available.push(i);
+    }
+    const idx = available[Math.floor(Math.random() * available.length)];
+    this.quiz.usedIndices.add(idx);
+    this.quiz.currentQ = quizQuestions[idx];
+    this.quiz.questionNum++;
+    this.quiz.answeredBy = null;
+    this.quiz.timeLeft = 20; // 20 seconds per question
+
+    this.emitToRoom('quizQuestion', {
+      num: this.quiz.questionNum,
+      question: this.quiz.currentQ.q,
+      category: this.quiz.currentQ.cat,
+      timeLeft: this.quiz.timeLeft,
+      scores: this.quiz.scores,
+    });
+
+    // Start countdown
+    this.quiz.timer = setInterval(() => {
+      if (!this.quiz || !this.quiz.active) return;
+      this.quiz.timeLeft--;
+      if (this.quiz.timeLeft <= 0) {
+        // Time's up — reveal answer and move on
+        if (this.quiz.timer) clearInterval(this.quiz.timer);
+        const ans = this.quiz.currentQ.a;
+        this.emitToRoom('quizTimeUp', { answer: ans, scores: this.quiz.scores });
+        // Next question after 3 seconds
+        setTimeout(() => {
+          if (this.quiz && this.quiz.active) this.nextQuizQuestion();
+        }, 3000);
+      } else {
+        this.emitToRoom('quizTick', this.quiz.timeLeft);
+      }
+    }, 1000);
+  }
+
+  checkQuizAnswer(playerName, text) {
+    if (!this.quiz || !this.quiz.active || !this.quiz.currentQ || this.quiz.answeredBy) return false;
+
+    const answer = text.toLowerCase().trim();
+    const correct = this.quiz.currentQ.a;
+    const alts = this.quiz.currentQ.alt || [];
+
+    const isCorrect = answer === correct || alts.some(a => answer === a) ||
+      // Fuzzy: check if answer contains the correct answer or vice versa (for short answers)
+      (correct.length >= 3 && answer.includes(correct)) ||
+      (answer.length >= 3 && correct.includes(answer)) ||
+      alts.some(a => (a.length >= 3 && answer.includes(a)) || (answer.length >= 3 && a.includes(answer)));
+
+    if (isCorrect) {
+      this.quiz.answeredBy = playerName;
+      this.quiz.scores[playerName] = (this.quiz.scores[playerName] || 0) + 1;
+      if (this.quiz.timer) clearInterval(this.quiz.timer);
+
+      this.emitToRoom('quizCorrect', {
+        player: playerName,
+        answer: this.quiz.currentQ.a,
+        scores: this.quiz.scores,
+      });
+
+      // Next question after 3 seconds
+      setTimeout(() => {
+        if (this.quiz && this.quiz.active) this.nextQuizQuestion();
+      }, 3000);
+      return true;
+    }
+    return false;
   }
 
   // Emit to all sockets in this room
@@ -198,6 +315,8 @@ class Room {
       slotProfiles: this.slotProfiles,
       adminSlot: this.adminSlot,
       chatHistory: this.chatHistory,
+      quizActive: !!(this.quiz && this.quiz.active),
+      quizScores: this.quiz ? this.quiz.scores : null,
     };
     for (const [sid, player] of Object.entries(this.players)) {
       io.to(sid).emit('roomState', { ...lobbyState, mySlot: player.slot });
@@ -533,6 +652,7 @@ class Room {
     if (!this.slots.every(s => s !== null)) return false;
 
     this.clearTimer();
+    if (this.quiz) this.stopQuiz(); // stop quiz when game starts
     this.countdownLeft = 0;
     this.roundStarter = 0;
     this.scores = { team1: 0, team2: 0 };
@@ -629,7 +749,7 @@ class Room {
       const team = getTeam(player.slot);
       this.scores[team]++;
       if (this.checkWin()) return;
-      this.roundStarter = this.roundStarter === 0 ? 1 : 0;
+      this.roundStarter = (this.roundStarter + 1) % 4;
       this.phase = 'roundOver';
       this.broadcastGameState();
       setTimeout(() => {
@@ -1065,7 +1185,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Lobby chat (persisted on room)
+  // Lobby chat (persisted on room) — also checks quiz answers
   socket.on('sendChat', ({ message } = {}) => {
     const code = socketRooms.get(socket.id);
     if (!code || !message) return;
@@ -1080,6 +1200,26 @@ io.on('connection', (socket) => {
     room.chatHistory.push(msg);
     if (room.chatHistory.length > 100) room.chatHistory.shift();
     room.emitToRoom('chatMessage', msg);
+
+    // Check if this chat message is a correct quiz answer
+    if (room.quiz && room.quiz.active) {
+      room.checkQuizAnswer(player.name, text);
+    }
+  });
+
+  // Quiz mini-game controls
+  socket.on('startQuiz', () => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (!room) return;
+    room.startQuiz(socket.id);
+  });
+
+  socket.on('stopQuiz', () => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (!room) return;
+    const player = room.players[socket.id];
+    if (!player || player.slot !== room.adminSlot) return;
+    room.stopQuiz();
   });
 
   // Admin test mode: fill empty slots with bots

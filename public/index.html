@@ -1252,6 +1252,84 @@
     }
     .chat-input-row button:hover { background: #1d4ed8; }
 
+    /* Quiz mini-game */
+    .quiz-panel {
+      width: 100%;
+      max-width: 380px;
+      margin-top: 16px;
+      background: linear-gradient(135deg, #1e1b4b, #172554);
+      border: 1px solid #7c3aed;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .quiz-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid #3730a3;
+    }
+    .quiz-header h4 {
+      margin: 0;
+      font-size: 0.85rem;
+      color: #a78bfa;
+    }
+    .quiz-header .quiz-timer {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #34d399;
+      min-width: 30px;
+      text-align: right;
+    }
+    .quiz-header .quiz-timer.urgent { color: #f87171; }
+    .quiz-question-area {
+      padding: 12px 14px;
+    }
+    .quiz-category {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7c3aed;
+      margin-bottom: 4px;
+    }
+    .quiz-question-text {
+      font-size: 1rem;
+      color: #e2e8f0;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .quiz-result {
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      border-top: 1px solid #3730a3;
+    }
+    .quiz-result.correct {
+      color: #34d399;
+      background: rgba(52, 211, 153, 0.08);
+    }
+    .quiz-result.timeout {
+      color: #f87171;
+      background: rgba(248, 113, 113, 0.08);
+    }
+    .quiz-scores {
+      padding: 6px 12px;
+      border-top: 1px solid #3730a3;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .quiz-score-item {
+      font-size: 0.75rem;
+      color: #c4b5fd;
+      background: rgba(124, 58, 237, 0.15);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .quiz-score-item .score-val {
+      font-weight: 700;
+      color: #a78bfa;
+    }
+
     /* Friends */
     .friends-card { margin-top: 0; }
     .friend-item {
@@ -1511,9 +1589,11 @@
       </ul>
       <p class="section-title">Round Rotation</p>
       <ul>
-        <li><strong>Round A:</strong> P1 sets the secret word &rarr; P2 sees it &rarr; P2 gives clue &rarr; P3 guesses &rarr; if miss: P1 clue &rarr; P4 guesses &rarr; repeat</li>
-        <li><strong>Round B:</strong> P2 sets the secret word &rarr; P4 sees it &rarr; P4 gives clue &rarr; P1 guesses &rarr; if miss: P2 clue &rarr; P3 guesses &rarr; repeat</li>
-        <li>Rounds alternate after each point scored.</li>
+        <li><strong>Round A:</strong> P1 sets secret &rarr; P2 sees it &rarr; P2 clue &rarr; P3 guesses &rarr; if miss: P1 clue &rarr; P4 guesses &rarr; repeat</li>
+        <li><strong>Round B:</strong> P2 sets secret &rarr; P3 sees it &rarr; P3 clue &rarr; P1 guesses &rarr; if miss: P2 clue &rarr; P4 guesses &rarr; repeat</li>
+        <li><strong>Round C:</strong> P3 sets secret &rarr; P4 sees it &rarr; P4 clue &rarr; P2 guesses &rarr; if miss: P3 clue &rarr; P1 guesses &rarr; repeat</li>
+        <li><strong>Round D:</strong> P4 sets secret &rarr; P1 sees it &rarr; P1 clue &rarr; P3 guesses &rarr; if miss: P4 clue &rarr; P2 guesses &rarr; repeat</li>
+        <li>Rounds rotate A &rarr; B &rarr; C &rarr; D after each point scored.</li>
       </ul>
       <p class="section-title">Scoring</p>
       <ul>
@@ -1559,6 +1639,9 @@
     let pendingRequests = [];
     let myGamesList = [];
     let screen = 'auth'; // auth | home | room | game
+
+    // Quiz mini-game state
+    let quizState = null; // { num, question, category, timeLeft, scores, result }
 
     // ─── Socket setup ──────────────────────────────
     function connectSocket() {
@@ -1664,6 +1747,37 @@
         }
       });
 
+      // ─── Quiz mini-game events ────────────────────
+      socket.on('quizQuestion', (data) => {
+        quizState = { num: data.num, question: data.question, category: data.category, timeLeft: data.timeLeft, scores: data.scores, result: null };
+        updateQuizPanel();
+      });
+
+      socket.on('quizTick', (timeLeft) => {
+        if (quizState) { quizState.timeLeft = timeLeft; updateQuizPanel(); }
+      });
+
+      socket.on('quizCorrect', (data) => {
+        if (quizState) {
+          quizState.result = { type: 'correct', player: data.player, answer: data.answer };
+          quizState.scores = data.scores;
+          updateQuizPanel();
+        }
+      });
+
+      socket.on('quizTimeUp', (data) => {
+        if (quizState) {
+          quizState.result = { type: 'timeout', answer: data.answer };
+          quizState.scores = data.scores;
+          updateQuizPanel();
+        }
+      });
+
+      socket.on('quizStopped', (data) => {
+        quizState = null;
+        updateQuizPanel();
+      });
+
       // ─── Friend events ──────────────────────────
       socket.on('friendsList', (data) => {
         friendsList = data.friends || [];
@@ -1716,6 +1830,7 @@
         currentRoomState = null;
         currentState = null;
         chatMessages = [];
+        quizState = null;
         mySlot = -1;
         screen = 'home';
         socket.emit('listPublicRooms');
@@ -2188,6 +2303,10 @@
               <button class="btn-countdown" onclick="socket.emit('startCountdown', 300)">5 min</button>
             </div>
             <button class="btn-countdown" style="margin-top:8px;background:#8b5cf6;width:100%" onclick="socket.emit('randomizeTeams')">🎲 Randomize Teams</button>
+            ${state.quizActive
+              ? '<button class="btn-countdown" style="margin-top:4px;background:#dc2626;width:100%" onclick="socket.emit(\'stopQuiz\')">⏹ Stop Quiz</button>'
+              : '<button class="btn-countdown" style="margin-top:4px;background:#7c3aed;width:100%" onclick="socket.emit(\'startQuiz\')">🧠 Start Quiz</button>'
+            }
             ${!allFilled ? '<p style="color:#64748b;font-size:0.85rem">Start Now requires all 4 slots. Use countdown to wait for players.</p>' : ''}
             ${isTestAdmin && !allFilled ? '<button class="btn-countdown" style="margin-top:8px;background:#7c3aed" onclick="socket.emit(\'testFillSlots\')">🤖 Fill with Bots</button>' : ''}
           </div>`;
@@ -2282,6 +2401,7 @@
           ${scheduleHTML}
           ${adminHTML}
           ${isRoomOwner ? `<button class="btn-delete-room" onclick="doDeleteRoom('${state.code}')">Delete Room</button>` : ''}
+          <div id="quizPanelContainer"></div>
           ${hasJoined && userProfile && friendsList.length ? `
             <div class="lobby-chat" style="margin-bottom:0;border-bottom:none;border-radius:10px 10px 0 0">
               <h4>Invite Friends</h4>
@@ -2304,7 +2424,7 @@
               <h4>Chat</h4>
               <div class="chat-messages" id="chatMessages">${chatMessages.map(m => `<div class="chat-msg"><span class="chat-name">${m.name}:</span>${m.text}</div>`).join('')}</div>
               <div class="chat-input-row">
-                <input type="text" id="chatInput" placeholder="Type a message..." maxlength="200" autocomplete="off" enterkeyhint="send"
+                <input type="text" id="chatInput" placeholder="${quizState ? 'Type your answer here...' : 'Type a message...'}" maxlength="200" autocomplete="off" enterkeyhint="send"
                   onkeydown="if(event.key==='Enter'){doSendChat();event.preventDefault()}"
                   onkeypress="if(event.keyCode===13){doSendChat();event.preventDefault()}">
                 <button onclick="doSendChat()" type="button">Send</button>
@@ -2317,6 +2437,48 @@
       // Auto-scroll chat to bottom
       const chatEl = document.getElementById('chatMessages');
       if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
+      // Render quiz panel if active
+      updateQuizPanel();
+    }
+
+    function updateQuizPanel() {
+      const container = document.getElementById('quizPanelContainer');
+      if (!container) return;
+      if (!quizState) { container.innerHTML = ''; return; }
+
+      const qs = quizState;
+      const timerClass = qs.timeLeft <= 5 ? 'urgent' : '';
+
+      let resultHTML = '';
+      if (qs.result) {
+        if (qs.result.type === 'correct') {
+          resultHTML = `<div class="quiz-result correct">✓ <b>${qs.result.player}</b> got it! Answer: <b>${qs.result.answer}</b></div>`;
+        } else if (qs.result.type === 'timeout') {
+          resultHTML = `<div class="quiz-result timeout">⏰ Time's up! Answer: <b>${qs.result.answer}</b></div>`;
+        }
+      }
+
+      let scoresHTML = '';
+      const scoreEntries = Object.entries(qs.scores || {}).sort((a, b) => b[1] - a[1]);
+      if (scoreEntries.length) {
+        scoresHTML = `<div class="quiz-scores">${scoreEntries.map(([name, pts]) =>
+          `<span class="quiz-score-item">${name}: <span class="score-val">${pts}</span></span>`
+        ).join('')}</div>`;
+      }
+
+      container.innerHTML = `
+        <div class="quiz-panel">
+          <div class="quiz-header">
+            <h4>🧠 Quiz #${qs.num}</h4>
+            <span class="quiz-timer ${timerClass}">${qs.result ? '—' : qs.timeLeft + 's'}</span>
+          </div>
+          <div class="quiz-question-area">
+            <div class="quiz-category">${qs.category || 'Trivia'}</div>
+            <div class="quiz-question-text">${qs.question}</div>
+          </div>
+          ${resultHTML}
+          ${scoresHTML}
+        </div>`;
     }
 
     function doLeaveRoom() {
