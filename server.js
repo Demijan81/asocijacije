@@ -448,6 +448,54 @@ class Room {
     return { slot, name: trimmedName, reconnectToken: rToken };
   }
 
+  // Admin can randomize player slot assignments (shuffle teams)
+  randomizeTeams(adminSocketId) {
+    const admin = this.players[adminSocketId];
+    if (!admin || admin.slot !== this.adminSlot) return false;
+    if (this.phase !== 'lobby' && this.phase !== 'waiting') return false;
+
+    // Collect occupied slot indices
+    const occupied = [];
+    for (let i = 0; i < 4; i++) {
+      if (this.slots[i] !== null || this.slotDisconnected[i]) occupied.push(i);
+    }
+    if (occupied.length < 2) return false; // need at least 2 players to shuffle
+
+    // Fisher-Yates shuffle of occupied indices to get new positions
+    const shuffled = [...occupied];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Save current data for occupied slots
+    const saved = occupied.map(i => ({
+      slot: i,
+      sid: this.slots[i],
+      name: this.slotNames[i],
+      profile: this.slotProfiles[i],
+      disconnected: this.slotDisconnected[i],
+      reserved: this.slotReserved[i],
+    }));
+
+    // Place each saved entry into its new slot position
+    for (let k = 0; k < occupied.length; k++) {
+      const newSlot = shuffled[k];
+      const data = saved[k];
+      this.slots[newSlot] = data.sid;
+      this.slotNames[newSlot] = data.name;
+      this.slotProfiles[newSlot] = data.profile;
+      this.slotDisconnected[newSlot] = data.disconnected;
+      this.slotReserved[newSlot] = data.reserved;
+      if (data.sid && this.players[data.sid]) {
+        this.players[data.sid].slot = newSlot;
+      }
+      if (data.slot === this.adminSlot) this.adminSlot = newSlot;
+    }
+
+    return true;
+  }
+
   // Admin can move a player to a different slot (team arrangement)
   movePlayer(adminSocketId, fromSlot, toSlot) {
     const admin = this.players[adminSocketId];
@@ -1148,6 +1196,19 @@ io.on('connection', (socket) => {
     const result = room.joinSlot(socket.id, slot, name);
     if (result) {
       socket.emit('assigned', { ...result, roomCode: room.code });
+      room.broadcastLobby();
+    }
+  });
+
+  socket.on('randomizeTeams', () => {
+    const room = rooms.get(socketRooms.get(socket.id));
+    if (!room) return;
+    if (room.randomizeTeams(socket.id)) {
+      // Notify all players of their new slots
+      for (let i = 0; i < 4; i++) {
+        const sid = room.slots[i];
+        if (sid) io.to(sid).emit('assigned', { slot: i, name: room.slotNames[i], roomCode: room.code });
+      }
       room.broadcastLobby();
     }
   });

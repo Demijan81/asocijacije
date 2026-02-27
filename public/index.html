@@ -2187,6 +2187,7 @@
               <button class="btn-countdown" onclick="socket.emit('startCountdown', 120)">2 min</button>
               <button class="btn-countdown" onclick="socket.emit('startCountdown', 300)">5 min</button>
             </div>
+            <button class="btn-countdown" style="margin-top:8px;background:#8b5cf6;width:100%" onclick="socket.emit('randomizeTeams')">🎲 Randomize Teams</button>
             ${!allFilled ? '<p style="color:#64748b;font-size:0.85rem">Start Now requires all 4 slots. Use countdown to wait for players.</p>' : ''}
             ${isTestAdmin && !allFilled ? '<button class="btn-countdown" style="margin-top:8px;background:#7c3aed" onclick="socket.emit(\'testFillSlots\')">🤖 Fill with Bots</button>' : ''}
           </div>`;
