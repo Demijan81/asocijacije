@@ -502,30 +502,60 @@ class Room {
   }
 
   tryReconnect(socketId, authUser, reconnectToken) {
+    // First: check for disconnected slots (normal reconnect)
     for (let i = 0; i < 4; i++) {
       if (!this.slotDisconnected[i]) continue;
       const res = this.slotReserved[i];
       if (!res) continue;
       if ((authUser && res.userId && authUser.id === res.userId) ||
           (reconnectToken && res.reconnectToken && reconnectToken === res.reconnectToken)) {
-        this.slots[i] = socketId;
-        this.slotDisconnected[i] = false;
-        this.players[socketId] = {
-          slot: i, name: res.name,
-          userId: authUser?.id || res.userId || null,
-          avatar: authUser?.avatar || res.avatar || null,
-          stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : res.stats || null
-        };
-        if (authUser) {
-          this.slotProfiles[i] = { userId: authUser.id, avatar: authUser.avatar, stats: { games_played: authUser.games_played, games_won: authUser.games_won } };
-        }
-        console.log(`[${this.code}] Player reconnected to slot ${i}: ${res.name}`);
-        if (this.disconnectTimer) { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
-        this.checkDisconnectedTurn();
-        return { slot: i, name: res.name, reconnectToken: res.reconnectToken };
+        return this._reconnectToSlot(i, socketId, authUser, res);
       }
     }
+
+    // Second: check for still-connected slots belonging to the same user (hard refresh takeover)
+    // The old socket hasn't fired 'disconnect' yet but the same user is connecting with a new socket
+    for (let i = 0; i < 4; i++) {
+      if (this.slotDisconnected[i]) continue; // already handled above
+      const oldSid = this.slots[i];
+      if (!oldSid || oldSid === socketId) continue;
+      const res = this.slotReserved[i];
+      if (!res) continue;
+      if ((authUser && res.userId && authUser.id === res.userId) ||
+          (reconnectToken && res.reconnectToken && reconnectToken === res.reconnectToken)) {
+        // Evict the old socket silently
+        delete this.players[oldSid];
+        console.log(`[${this.code}] Slot ${i}: takeover from old socket ${oldSid} by new socket ${socketId}`);
+        return this._reconnectToSlot(i, socketId, authUser, res);
+      }
+    }
+
     return null;
+  }
+
+  _reconnectToSlot(i, socketId, authUser, res) {
+    this.slots[i] = socketId;
+    this.slotDisconnected[i] = false;
+    this.players[socketId] = {
+      slot: i, name: res.name,
+      userId: authUser?.id || res.userId || null,
+      avatar: authUser?.avatar || res.avatar || null,
+      stats: authUser ? { games_played: authUser.games_played, games_won: authUser.games_won } : res.stats || null
+    };
+    if (authUser) {
+      this.slotProfiles[i] = { userId: authUser.id, avatar: authUser.avatar, stats: { games_played: authUser.games_played, games_won: authUser.games_won } };
+    }
+    console.log(`[${this.code}] Player reconnected to slot ${i}: ${res.name}`);
+    if (this.disconnectTimer) { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
+
+    // Restore admin: room creator always gets admin back, or if no admin is set
+    const reconnectedUserId = authUser?.id || res.userId || null;
+    if (this.adminSlot === -1 || (reconnectedUserId && reconnectedUserId === this.createdBy)) {
+      this.adminSlot = i;
+    }
+
+    this.checkDisconnectedTurn();
+    return { slot: i, name: res.name, reconnectToken: res.reconnectToken };
   }
 
   joinSlot(socketId, slot, name) {
@@ -818,6 +848,13 @@ class Room {
 
     if (player.slot >= 0) {
       const slot = player.slot;
+
+      // If another socket already took over this slot (hard refresh), skip slot cleanup
+      if (this.slots[slot] !== null && this.slots[slot] !== socketId) {
+        delete this.players[socketId];
+        return;
+      }
+
       const wasAdmin = slot === this.adminSlot;
 
       // Always keep slotted players reserved — they can reconnect
