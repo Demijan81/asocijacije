@@ -9,6 +9,7 @@ on:
       - 'server.js'
       - 'db.js'
       - 'auth.js'
+      - 'quiz-questions.js'
       - 'public/**'
       - 'package.json'
       - 'package-lock.json'
