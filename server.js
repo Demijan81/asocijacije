@@ -114,24 +114,27 @@ function generateCode() {
   return code;
 }
 
-// Teams: P1(slot0) + P4(slot3) = team1, P2(slot1) + P3(slot2) = team2
-// 4 rounds rotate the secret holder through all players.
-// Each round: receiver = next player clockwise. Clue/guess alternates between two pairs.
-//   Round A (0): P1 secret → P2 sees → (P2 clue, P3 guess) → (P1 clue, P4 guess) → repeat
-//   Round B (1): P2 secret → P3 sees → (P3 clue, P1 guess) → (P2 clue, P4 guess) → repeat
-//   Round C (2): P3 secret → P4 sees → (P4 clue, P2 guess) → (P3 clue, P1 guess) → repeat
-//   Round D (3): P4 secret → P1 sees → (P1 clue, P3 guess) → (P4 clue, P2 guess) → repeat
+// Teams: P1(slot0) + P3(slot2) = team1, P2(slot1) + P4(slot3) = team2
+// 4 rounds rotate the secret holder: P1 → P2 → P3 → P4 → P1...
+// Each round: receiver = next player clockwise (S+1)%4.
+// Both knowers (holder + receiver) alternate giving clues to their own teammate.
+//   Round 0: P1 secret → P2 sees → P2 clue→P4 guess, P1 clue→P3 guess, repeat
+//   Round 1: P2 secret → P3 sees → P3 clue→P1 guess, P2 clue→P4 guess, repeat
+//   Round 2: P3 secret → P4 sees → P4 clue→P2 guess, P3 clue→P1 guess, repeat
+//   Round 3: P4 secret → P1 sees → P1 clue→P3 guess, P4 clue→P2 guess, repeat
 
 function getTeam(slot) {
-  return (slot === 0 || slot === 3) ? 'team1' : 'team2';
+  return (slot === 0 || slot === 2) ? 'team1' : 'team2';
 }
 
 // Pre-computed turn tables per round starter [clueGiver, guesser] for even/odd turns
+// Even turn: receiver clues → receiver's teammate guesses
+// Odd turn:  holder clues → holder's teammate guesses
 const ROUND_TURNS = {
-  0: [[1, 2], [0, 3]], // Round A
-  1: [[2, 0], [1, 3]], // Round B
-  2: [[3, 1], [2, 0]], // Round C
-  3: [[0, 2], [3, 1]], // Round D
+  0: [[1, 3], [0, 2]], // P2 clue→P4, P1 clue→P3
+  1: [[2, 0], [1, 3]], // P3 clue→P1, P2 clue→P4
+  2: [[3, 1], [2, 0]], // P4 clue→P2, P3 clue→P1
+  3: [[0, 2], [3, 1]], // P1 clue→P3, P4 clue→P2
 };
 
 function getRoundConfig(roundStarter, turnWithinRound) {

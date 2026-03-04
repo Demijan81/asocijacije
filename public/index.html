@@ -1577,23 +1577,23 @@
       <button class="modal-close" onclick="toggleRules()">&times;</button>
       <h2>How to Play</h2>
       <div class="team-info">
-        <div class="team-box blue">Team Blue<br>P1 (top-left) + P4 (bottom-right)</div>
-        <div class="team-box gold">Team Gold<br>P2 (top-right) + P3 (bottom-left)</div>
+        <div class="team-box blue">Team Blue<br>P1 (top-left) + P3 (bottom-left)</div>
+        <div class="team-box gold">Team Gold<br>P2 (top-right) + P4 (bottom-right)</div>
       </div>
       <p class="section-title">Game Flow</p>
       <ul>
-        <li>The <strong>secret holder</strong> types a secret word that only their <strong>opponent teammate</strong> can see.</li>
-        <li>That opponent gives a <strong>one-word clue</strong> visible to everyone.</li>
-        <li>The <strong>guesser</strong> (from the other pair) has <strong>30 seconds</strong> to guess the secret word with one try.</li>
-        <li>If they miss, the clue-giving and guessing <strong>rotates</strong> between the two pairs until someone guesses correctly.</li>
+        <li>The <strong>secret holder</strong> types a secret word that only the <strong>next player</strong> (receiver) can see.</li>
+        <li>Both knowers (holder &amp; receiver) alternate giving <strong>one-word clues</strong> visible to everyone.</li>
+        <li>Each knower clues to their <strong>own teammate</strong>, who tries to guess the secret word.</li>
+        <li>If a guess is wrong, the other knower gives a clue and their teammate guesses. This <strong>alternates</strong> until someone guesses correctly.</li>
       </ul>
       <p class="section-title">Round Rotation</p>
       <ul>
-        <li><strong>Round A:</strong> P1 sets secret &rarr; P2 sees it &rarr; P2 clue &rarr; P3 guesses &rarr; if miss: P1 clue &rarr; P4 guesses &rarr; repeat</li>
-        <li><strong>Round B:</strong> P2 sets secret &rarr; P3 sees it &rarr; P3 clue &rarr; P1 guesses &rarr; if miss: P2 clue &rarr; P4 guesses &rarr; repeat</li>
-        <li><strong>Round C:</strong> P3 sets secret &rarr; P4 sees it &rarr; P4 clue &rarr; P2 guesses &rarr; if miss: P3 clue &rarr; P1 guesses &rarr; repeat</li>
-        <li><strong>Round D:</strong> P4 sets secret &rarr; P1 sees it &rarr; P1 clue &rarr; P3 guesses &rarr; if miss: P4 clue &rarr; P2 guesses &rarr; repeat</li>
-        <li>Rounds rotate A &rarr; B &rarr; C &rarr; D after each point scored.</li>
+        <li><strong>Round 1:</strong> P1 secret &rarr; P2 sees &rarr; P2 clue&rarr;P4 guesses, P1 clue&rarr;P3 guesses, repeat</li>
+        <li><strong>Round 2:</strong> P2 secret &rarr; P3 sees &rarr; P3 clue&rarr;P1 guesses, P2 clue&rarr;P4 guesses, repeat</li>
+        <li><strong>Round 3:</strong> P3 secret &rarr; P4 sees &rarr; P4 clue&rarr;P2 guesses, P3 clue&rarr;P1 guesses, repeat</li>
+        <li><strong>Round 4:</strong> P4 secret &rarr; P1 sees &rarr; P1 clue&rarr;P3 guesses, P4 clue&rarr;P2 guesses, repeat</li>
+        <li>Rounds rotate 1 &rarr; 2 &rarr; 3 &rarr; 4 after each point scored.</li>
       </ul>
       <p class="section-title">Scoring</p>
       <ul>
@@ -2281,8 +2281,8 @@
     function renderRoomLobby(state) {
       const app = document.getElementById('app');
       const slots = state.slots;
-      const teamLabels = ['Team Blue', 'Team Gold', 'Team Gold', 'Team Blue'];
-      const teamClasses = ['t1', 't2', 't2', 't1'];
+      const teamLabels = ['Team Blue', 'Team Gold', 'Team Blue', 'Team Gold'];
+      const teamClasses = ['t1', 't2', 't1', 't2'];
       const hasJoined = mySlot >= 0;
       const isAdmin = mySlot === state.adminSlot;
       const isRoomOwner = userProfile && state.createdBy === userProfile.id;
@@ -2566,7 +2566,7 @@
       return state.slotNames[slot] || ('Player ' + (slot + 1));
     }
 
-    function getTeamClass(slot) { return (slot === 0 || slot === 3) ? 'team1' : 'team2'; }
+    function getTeamClass(slot) { return (slot === 0 || slot === 2) ? 'team1' : 'team2'; }
 
     function getSlotProfile(slot, state) { return state?.slotProfiles?.[slot] || null; }
 
@@ -2600,12 +2600,12 @@
     function renderGameOver(app, state) {
       const winner = state.scores.team1 > state.scores.team2 ? 'team1' : 'team2';
       const n = state.slotNames || ['P1','P2','P3','P4'];
-      const winnerName = winner === 'team1' ? `Team Blue (${n[0]||'P1'} & ${n[3]||'P4'})` : `Team Gold (${n[1]||'P2'} & ${n[2]||'P3'})`;
+      const winnerName = winner === 'team1' ? `Team Blue (${n[0]||'P1'} & ${n[2]||'P3'})` : `Team Gold (${n[1]||'P2'} & ${n[3]||'P4'})`;
       const winnerClass = winner === 'team1' ? 'winner-team1' : 'winner-team2';
       if (userProfile) apiGet('/me').then(d => { if(d.profile){userProfile=d.profile;updateProfileBar();} });
 
-      const teamSlots = { team1: [0, 3], team2: [1, 2] };
-      const teamClasses = ['t1', 't2', 't2', 't1'];
+      const teamSlots = { team1: [0, 2], team2: [1, 3] };
+      const teamClasses = ['t1', 't2', 't1', 't2'];
       const profs = state.slotProfiles || [null, null, null, null];
       const playersHTML = [0, 1, 2, 3].map(i => {
         const prof = profs[i];
