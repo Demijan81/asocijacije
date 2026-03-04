@@ -1577,8 +1577,8 @@
       <button class="modal-close" onclick="toggleRules()">&times;</button>
       <h2>How to Play</h2>
       <div class="team-info">
-        <div class="team-box blue">Team Blue<br>P1 (top-left) + P3 (bottom-left)</div>
-        <div class="team-box gold">Team Gold<br>P2 (top-right) + P4 (bottom-right)</div>
+        <div class="team-box blue">Team Blue<br>P1 (top-left) + P3 (bottom-right)</div>
+        <div class="team-box gold">Team Gold<br>P2 (top-right) + P4 (bottom-left)</div>
       </div>
       <p class="section-title">Game Flow</p>
       <ul>
@@ -2287,8 +2287,9 @@
     function renderRoomLobby(state) {
       const app = document.getElementById('app');
       const slots = state.slots;
-      const teamLabels = ['Team Blue', 'Team Gold', 'Team Blue', 'Team Gold'];
-      const teamClasses = ['t1', 't2', 't1', 't2'];
+      const teamLabels = ['Team Blue', 'Team Gold', 'Team Gold', 'Team Blue'];
+      const teamClasses = ['t1', 't2', 't2', 't1'];
+      const visualOrder = [0, 1, 3, 2]; // diagonals: P1+P3, P2+P4
       const hasJoined = mySlot >= 0;
       const isAdmin = mySlot === state.adminSlot;
       const isRoomOwner = userProfile && state.createdBy === userProfile.id;
@@ -2380,7 +2381,8 @@
             <p class="status-text" style="margin-bottom:16px">Click an empty slot to join</p>
           ` : ''}
           <div class="slot-grid">
-            ${slots.map((s, i) => {
+            ${visualOrder.map(i => {
+              const s = slots[i];
               const isDisc = s?.disconnected || false;
               const isTaken = s !== null || isDisc;
               const isMe = i === mySlot;
@@ -2611,7 +2613,7 @@
       if (userProfile) apiGet('/me').then(d => { if(d.profile){userProfile=d.profile;updateProfileBar();} });
 
       const teamSlots = { team1: [0, 2], team2: [1, 3] };
-      const teamClasses = ['t1', 't2', 't1', 't2'];
+      const teamClasses = ['t1', 't2', 't2', 't1'];
       const profs = state.slotProfiles || [null, null, null, null];
       const playersHTML = [0, 1, 2, 3].map(i => {
         const prof = profs[i];
@@ -2730,7 +2732,7 @@
         }
       }
 
-      app.innerHTML = `<div class="game-container">${playerCard(0,'top-left')}${playerCard(1,'top-right')}<div class="center-area">${centerHTML}</div>${playerCard(2,'bottom-left')}${playerCard(3,'bottom-right')}</div>${testHTML}`;
+      app.innerHTML = `<div class="game-container">${playerCard(0,'top-left')}${playerCard(1,'top-right')}<div class="center-area">${centerHTML}</div>${playerCard(3,'bottom-left')}${playerCard(2,'bottom-right')}</div>${testHTML}`;
       const input = document.querySelector('.input-area input');
       if (input) {
         input.addEventListener('focus', () => { gameInputFocused = true; });
