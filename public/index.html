@@ -1694,8 +1694,14 @@
         mySlot = state.mySlot;
         screen = 'game';
 
-        // Detect if the turn/phase actually changed
+        // Debug: log every state update with role info
         const ct = state.currentTurn;
+        if (ct) {
+          const names = state.slotNames || ['P1','P2','P3','P4'];
+          console.log(`[GAME] phase=${state.phase} roundStarter=${state.roundStarter} | secret:P${ct.secretHolder+1}(${names[ct.secretHolder]}) recv:P${ct.receiver+1}(${names[ct.receiver]}) clue:P${ct.clueGiver+1}(${names[ct.clueGiver]}) guess:P${ct.guesser+1}(${names[ct.guesser]}) | mySlot=${state.mySlot}`);
+        }
+
+        // Detect if the turn/phase actually changed
         const pct = prev?.currentTurn;
         const phaseChanged = !prev || prev.phase !== state.phase;
         const turnChanged = ct?.clueGiver !== pct?.clueGiver || ct?.guesser !== pct?.guesser || ct?.secretHolder !== pct?.secretHolder;
