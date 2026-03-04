@@ -115,35 +115,37 @@ function generateCode() {
 }
 
 // Teams: P1(slot0) + P3(slot2) = team1, P2(slot1) + P4(slot3) = team2
-// 4 rounds rotate the secret holder: P1 → P2 → P3 → P4 → P1...
-// Each round: receiver = next player clockwise (S+1)%4.
-// Both knowers (holder + receiver) alternate giving clues to their own teammate.
-//   Round 0: P1 secret → P2 sees → P2 clue→P4 guess, P1 clue→P3 guess, repeat
-//   Round 1: P2 secret → P3 sees → P3 clue→P1 guess, P2 clue→P4 guess, repeat
-//   Round 2: P3 secret → P4 sees → P4 clue→P2 guess, P3 clue→P1 guess, repeat
-//   Round 3: P4 secret → P1 sees → P1 clue→P3 guess, P4 clue→P2 guess, repeat
+// Teammate of any player: (slot + 2) % 4  (diagonal seating)
+//
+// Secret holder rotates: P1 → P2 → P3 → P4 → P1...
+// Receiver = next clockwise: (holder + 1) % 4
+//
+// Clue/guess alternation within a round:
+//   Even turns: receiver gives clue → receiver's teammate guesses
+//   Odd turns:  holder gives clue → holder's teammate guesses
+//
+// Example all 4 rounds:
+//   Round 0: P1 secret → P2 sees → P2 clue→P4 guess, P1 clue→P3 guess, ...
+//   Round 1: P2 secret → P3 sees → P3 clue→P1 guess, P2 clue→P4 guess, ...
+//   Round 2: P3 secret → P4 sees → P4 clue→P2 guess, P3 clue→P1 guess, ...
+//   Round 3: P4 secret → P1 sees → P1 clue→P3 guess, P4 clue→P2 guess, ...
 
 function getTeam(slot) {
   return (slot === 0 || slot === 2) ? 'team1' : 'team2';
 }
 
-// Pre-computed turn tables per round starter [clueGiver, guesser] for even/odd turns
-// Even turn: receiver clues → receiver's teammate guesses
-// Odd turn:  holder clues → holder's teammate guesses
-const ROUND_TURNS = {
-  0: [[1, 3], [0, 2]], // P2 clue→P4, P1 clue→P3
-  1: [[2, 0], [1, 3]], // P3 clue→P1, P2 clue→P4
-  2: [[3, 1], [2, 0]], // P4 clue→P2, P3 clue→P1
-  3: [[0, 2], [3, 1]], // P1 clue→P3, P4 clue→P2
-};
-
 function getRoundConfig(roundStarter, turnWithinRound) {
   const S = roundStarter % 4;
   const secretHolder = S;
   const receiver = (S + 1) % 4;
-  const parity = turnWithinRound % 2; // 0 = even, 1 = odd
-  const [clueGiver, guesser] = ROUND_TURNS[S][parity];
-  return { secretHolder, receiver, clueGiver, guesser };
+
+  if (turnWithinRound % 2 === 0) {
+    // Even turn: receiver clues, receiver's teammate guesses
+    return { secretHolder, receiver, clueGiver: receiver, guesser: (receiver + 2) % 4 };
+  } else {
+    // Odd turn: holder clues, holder's teammate guesses
+    return { secretHolder, receiver, clueGiver: secretHolder, guesser: (secretHolder + 2) % 4 };
+  }
 }
 
 class Room {
@@ -418,6 +420,9 @@ class Room {
   startClueTurn() {
     this.clearTimer();
     this.phase = 'clue';
+    const cfg = getRoundConfig(this.roundStarter, this.turnWithinRound);
+    const names = this.slotNames;
+    console.log(`[${this.code}] CLUE TURN: roundStarter=${this.roundStarter} turn=${this.turnWithinRound} clueGiver=P${cfg.clueGiver+1}(${names[cfg.clueGiver]}) guesser=P${cfg.guesser+1}(${names[cfg.guesser]})`);
     this.broadcastGameState();
     this.checkDisconnectedTurn();
   }
@@ -427,6 +432,9 @@ class Room {
     this.clues = [];
     this.turnWithinRound = 0;
     this.phase = 'secret';
+    const cfg = getRoundConfig(this.roundStarter, 0);
+    const names = this.slotNames;
+    console.log(`[${this.code}] NEW ROUND: roundStarter=${this.roundStarter} secretHolder=P${cfg.secretHolder+1}(${names[cfg.secretHolder]}) receiver=P${cfg.receiver+1}(${names[cfg.receiver]})`);
     this.broadcastGameState();
     this.checkDisconnectedTurn();
   }
