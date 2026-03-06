@@ -2714,7 +2714,11 @@
           centerHTML += `<p class="status-text">${getDisplayName(ct.guesser,state)} is guessing...</p>`;
         }
       } else if (phase === 'roundOver') {
-        centerHTML += '<div class="round-over-msg">Correct! Point scored!</div>';
+        if (state.roundOverReason === 'limit') {
+          centerHTML += '<div class="round-over-msg" style="color:#f87171">Too many clues! No point awarded.</div>';
+        } else {
+          centerHTML += '<div class="round-over-msg">Correct! Point scored!</div>';
+        }
       }
 
       // Test mode panel for admin

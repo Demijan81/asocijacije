@@ -356,6 +356,7 @@ class Room {
         secretWord: null,
         currentTurn: config ? { secretHolder: config.secretHolder, receiver: config.receiver, clueGiver: config.clueGiver, guesser: config.guesser } : null,
         roundStarter: this.roundStarter,
+        roundOverReason: this.roundOverReason || null,
       };
 
       if (this.secretWord && config) {
@@ -419,6 +420,17 @@ class Room {
 
   startClueTurn() {
     this.clearTimer();
+    if (this.turnWithinRound >= 10) {
+      console.log(`[${this.code}] ROUND LIMIT: 10 turns reached, no point awarded. Advancing round.`);
+      this.roundStarter = (this.roundStarter + 1) % 4;
+      this.phase = 'roundOver';
+      this.roundOverReason = 'limit';
+      this.broadcastGameState();
+      setTimeout(() => {
+        if (this.phase === 'roundOver') this.startNewRound();
+      }, 3000);
+      return;
+    }
     this.phase = 'clue';
     const cfg = getRoundConfig(this.roundStarter, this.turnWithinRound);
     const names = this.slotNames;
@@ -431,6 +443,7 @@ class Room {
     this.secretWord = null;
     this.clues = [];
     this.turnWithinRound = 0;
+    this.roundOverReason = null;
     this.phase = 'secret';
     const cfg = getRoundConfig(this.roundStarter, 0);
     const names = this.slotNames;
@@ -792,6 +805,7 @@ class Room {
       if (this.checkWin()) return;
       this.roundStarter = (this.roundStarter + 1) % 4;
       this.phase = 'roundOver';
+      this.roundOverReason = 'correct';
       this.broadcastGameState();
       setTimeout(() => {
         if (this.phase === 'roundOver') this.startNewRound();
