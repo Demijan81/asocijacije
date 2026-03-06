@@ -50,6 +50,7 @@
       justify-content: center;
       padding: 16px;
       min-height: 200px;
+      overflow: hidden;
     }
 
     /* Player card */
@@ -132,6 +133,9 @@
       margin-bottom: 16px;
       width: 100%;
       max-width: 400px;
+      max-height: 200px;
+      overflow-y: auto;
+      flex-shrink: 1;
     }
 
     .clue-entry {
@@ -2733,6 +2737,8 @@
       }
 
       app.innerHTML = `<div class="game-container">${playerCard(0,'top-left')}${playerCard(1,'top-right')}<div class="center-area">${centerHTML}</div>${playerCard(3,'bottom-left')}${playerCard(2,'bottom-right')}</div>${testHTML}`;
+      const clueListEl = document.querySelector('.clue-list');
+      if (clueListEl) clueListEl.scrollTop = clueListEl.scrollHeight;
       const input = document.querySelector('.input-area input');
       if (input) {
         input.addEventListener('focus', () => { gameInputFocused = true; });
